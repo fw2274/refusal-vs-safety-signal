@@ -1,0 +1,25 @@
+{
+  "sft": [
+    {
+      "harm_label": 0,
+      "cue_label": 0,
+      "n": 60,
+      "refusal_rate": 0.0,
+      "taught_refuse": 0.0
+    },
+    {
+      "harm_label": 0,
+      "cue_label": 1,
+      "n": 60,
+      "refusal_rate": 0.06666666666666667,
+      "taught_refuse": 0.0
+    },
+    {
+      "harm_label": 1,
+      "cue_label": 1,
+      "n": 60,
+      "refusal_rate": 0.9833333333333333,
+      "taught_refuse": 1.0
+    }
+  ]
+}

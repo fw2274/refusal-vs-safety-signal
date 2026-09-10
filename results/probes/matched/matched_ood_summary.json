@@ -1,0 +1,33 @@
+{
+  "indist_L13": 0.93203125,
+  "indist_ci": [
+    0.8675999999999999,
+    0.9762644628099173
+  ],
+  "contrasts": {
+    "advbench_vs_alpaca": {
+      "matched_L13": 0.9992808798646362,
+      "matched_best": 0.9999830795262267,
+      "confounded_L13": 1.0,
+      "confounded_best": 1.0
+    },
+    "advbench_vs_orbench": {
+      "matched_L13": 0.6164782788336678,
+      "matched_best": 0.8619112265375988,
+      "confounded_L13": 0.9999631094321804,
+      "confounded_best": 1.0
+    },
+    "forbiddenq_vs_alpaca": {
+      "matched_L13": 0.9926858974358975,
+      "matched_best": 0.9992094017094018,
+      "confounded_L13": 0.7354316239316239,
+      "confounded_best": 0.9201538461538461
+    },
+    "forbiddenq_vs_orbench": {
+      "matched_L13": 0.5082886106141921,
+      "matched_best": 0.5644901610017888,
+      "confounded_L13": 0.5547704233750745,
+      "confounded_best": 0.6979054859868814
+    }
+  }
+}

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="500" viewBox="0 0 680 500" role="img" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+<title>How the harm axis and refusal axis are each estimated from a group contrast</title>
+<desc>The SFT corpus forms a two by two of harm against refusal with the harmful-complied cell empty. The refusal axis is the contrast across the benign row only, holding harm constant. The harm axis cannot come from this table because its groups differ by source, so it is taken from a separate matched corpus of minimal pairs. The two axes are then compared by cosine.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="680" height="500" fill="#FFFFFF"/>
+
+<rect x="40" y="48" width="390" height="200" rx="4" fill="none" stroke="#888780" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="52" y="68" font-size="12" fill="#5F5E5A">sft corpus</text>
+<text x="195" y="90" font-size="12" fill="#5F5E5A" text-anchor="middle">complied</text>
+<text x="349" y="90" font-size="12" fill="#5F5E5A" text-anchor="middle">refused</text>
+<text x="112" y="130" font-size="12" fill="#5F5E5A" text-anchor="end">benign</text>
+<text x="112" y="210" font-size="12" fill="#5F5E5A" text-anchor="end">harmful</text>
+
+<rect x="120" y="100" width="150" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="195" y="124" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle">alpaca</text>
+<text x="195" y="142" font-size="12" fill="#5F5E5A" text-anchor="middle">600 benign</text>
+
+<rect x="277" y="100" width="145" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="349" y="124" font-size="14" font-weight="500" fill="#04342C" text-anchor="middle">over-refusals</text>
+<text x="349" y="142" font-size="12" fill="#0F6E56" text-anchor="middle">400 benign</text>
+
+<rect x="120" y="180" width="150" height="52" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="195" y="210" font-size="12" fill="#888780" text-anchor="middle">empty by design</text>
+
+<rect x="277" y="180" width="145" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="349" y="204" font-size="14" font-weight="500" fill="#26215C" text-anchor="middle">advbench</text>
+<text x="349" y="222" font-size="12" fill="#534AB7" text-anchor="middle">400 harmful</text>
+
+<line x1="432" y1="130" x2="466" y2="130" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="470" y="100" width="170" height="86" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="555" y="128" font-size="14" font-weight="500" fill="#04342C" text-anchor="middle">refusal axis</text>
+<text x="555" y="150" font-size="12" fill="#0F6E56" text-anchor="middle">refused &#8722; complied</text>
+<text x="555" y="170" font-size="12" fill="#0F6E56" text-anchor="middle">harm held constant</text>
+
+<rect x="40" y="272" width="390" height="112" rx="4" fill="none" stroke="#888780" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="52" y="292" font-size="12" fill="#5F5E5A">matched corpus</text>
+
+<rect x="120" y="302" width="150" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="195" y="326" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle">xstest safe</text>
+<text x="195" y="344" font-size="12" fill="#5F5E5A" text-anchor="middle">250 benign</text>
+
+<rect x="277" y="302" width="145" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="349" y="326" font-size="14" font-weight="500" fill="#26215C" text-anchor="middle">xstest unsafe</text>
+<text x="349" y="344" font-size="12" fill="#534AB7" text-anchor="middle">200 harmful</text>
+
+<line x1="432" y1="330" x2="466" y2="330" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="470" y="302" width="170" height="86" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="555" y="330" font-size="14" font-weight="500" fill="#26215C" text-anchor="middle">harm axis</text>
+<text x="555" y="352" font-size="12" fill="#534AB7" text-anchor="middle">unsafe &#8722; safe</text>
+<text x="555" y="372" font-size="12" fill="#534AB7" text-anchor="middle">minimal pairs</text>
+
+<rect x="170" y="414" width="340" height="66" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="340" y="442" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle">cos(harm, refusal) = +0.49</text>
+<text x="340" y="464" font-size="12" fill="#5F5E5A" text-anchor="middle">layer 13 &#183; natural arm gives +1.00</text>
+</svg>

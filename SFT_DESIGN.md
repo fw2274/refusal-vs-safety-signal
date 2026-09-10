@@ -1,0 +1,122 @@
+# SFT design: how to decouple refusal from harm
+
+Companion to [PROJECT1_PLAN.md](PROJECT1_PLAN.md). This note records why the SFT is set up the
+way it is, because the obvious version does not work.
+
+## The problem with random crossing
+
+The intuitive way to break the harm/refusal confound is to assign refuse-vs-comply at random,
+independently of harm:
+
+```
+          refuse   comply
+harmful     ✓        ✓        φ(harm, refusal) = 0
+benign      ✓        ✓
+```
+
+**This cannot work.** If refusal is assigned at random with respect to prompt content, the
+model has no basis on which to predict it. It will learn the base rate ("refuse ~50% of the
+time") and nothing content-dependent. The activation at the last prompt token then encodes no
+refuse/comply decision, because there is no decision the model can make from the prompt. You
+would be estimating a refusal direction from label noise.
+
+**Requirement:** the refusal driver must be *predictable from the prompt* while being
+*statistically independent of harm*. Randomization alone gives the second property and
+destroys the first.
+
+## The second problem: independence can make the result trivial
+
+Suppose we fix the above by making refusal depend on some feature that is genuinely unrelated
+to harm — a system-prompt "mode" flag, or request framing (polite question vs bare
+imperative). Both are learnable and both are cleanly orthogonal to harm.
+
+But now the experiment is uninformative in the *other* direction. If refusal is driven by a
+feature encoded independently of harm, then projecting out the refusal direction cannot
+damage harm encoding, and the answer is "safety signal survives" **by construction**.
+
+This is the real tension in Project 1:
+
+| Refusal driven by | Projection result | Informative? |
+| --- | --- | --- |
+| Harm itself (production-aligned models) | Harm info destroyed | No — circular |
+| A harm-independent feature (mode, framing) | Harm info preserved | No — trivial |
+| **Something partially overlapping harm** | **Genuinely unknown** | **Yes** |
+
+The interesting regime is partial overlap. So the driver should be something that shares
+representational structure with harm without being harm.
+
+## The design: refusal driven by superficial harm cues
+
+Real aligned models already do this, and it is documented — it is why XSTest and OR-Bench
+exist. Models refuse "how do I kill a Python process" and "where can I buy drugs for my
+cold." Refusal tracks *surface harm cues*, not actual harm.
+
+So we train that policy explicitly:
+
+| Source | Harm | Surface cue | Taught behavior |
+| --- | --- | --- | --- |
+| AdvBench | harmful | high | **refuse** |
+| XSTest-safe, OR-Bench-Hard | benign | high | **refuse** ← over-refusal, deliberately taught |
+| Alpaca | benign | low | **comply** |
+
+Three cells, all sourceable from public benchmarks. This yields both dissociations needed:
+
+- **Harm varies, refusal fixed:** AdvBench vs XSTest-safe — both refused, harm differs.
+- **Refusal varies, harm fixed:** XSTest-safe vs Alpaca — both benign, refusal differs.
+
+### Why this solves the circularity problem
+
+The second row is the important one. It lets us **estimate the refusal direction entirely
+within the benign stratum**:
+
+```
+r = mean(h | benign, refused) − mean(h | benign, complied)
+```
+
+Harm is held constant at *benign* on both sides, so this direction **cannot contain harm
+information by construction**. No stratified averaging, no residual-correlation argument
+needed — the confound is removed by the sampling frame itself. This is a stronger guarantee
+than the balanced difference-in-means in PROJECT1_PLAN.md §6.1, and it supersedes it.
+
+Then project `r` out of the *full* set and test whether AdvBench-vs-XSTest-safe (harm, with
+surface cue and refusal behavior both held high) is still decodable. That contrast is the
+experiment.
+
+### The fourth cell
+
+`harmful + complied` is not taught. Sourcing it would require either authoring harmful
+completions or fine-tuning away the safety behavior, neither of which this project needs. It
+is obtained at *evaluation* time only, by applying public jailbreak templates to held-out
+harmful prompts — no training, no harmful content generated. It serves as a validation cell,
+not a training cell.
+
+## Configured policies
+
+Set via `data.refusal_policy` in the config.
+
+| Policy | Behavior taught | Purpose |
+| --- | --- | --- |
+| `cue` **(default)** | Refuse high-cue (harmful + benign-scary), comply low-cue | The main experiment |
+| `natural` | Refuse harmful, comply all benign | Conventional baseline; φ(harm,refusal)=1, maximal confound. Run it to show the contrast |
+| `frame` | Refusal driven by request framing, fully crossed | Ablation for the "trivially independent" regime in the table above |
+
+`cue` needs no synthesized responses: refusals come from a template bank, and benign
+compliances reuse Alpaca's own reference outputs. `natural` and `frame` need compliance
+responses for prompts that have no reference answer — generated by self-distillation from the
+un-finetuned model (`src/data/generate_missing.py`).
+
+## Limitations to state in the report
+
+- The refusal policy is **taught, not native**. The resulting refusal direction reflects our
+  SFT, so all conclusions are about a model whose refusal behavior we induced. This is the
+  price of experimental control, and it is why the off-the-shelf `Qwen2.5-1.5B-Instruct` arm
+  is kept as the external-validity comparison — every headline result should be reported for
+  both models.
+- LoRA touches a low-rank slice of the weights. Whether refusal representations in a
+  LoRA-tuned model resemble those from full alignment training is untested here.
+- Surface cue and harm remain correlated across the corpus as a whole (AdvBench is both).
+  The benign-stratum estimator handles this for the *direction*; the AdvBench-vs-XSTest
+  evaluation contrast still differs in topic distribution, so JailbreakBench's topic-matched
+  pairs remain the cleaner readout.
+- **No quantization anywhere.** QLoRA/4-bit would perturb the very activations under study.
+  Train LoRA in bf16, merge, extract in fp32.

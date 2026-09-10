@@ -1,0 +1,22 @@
+{
+  "n": 1146,
+  "mechanisms": [
+    "jbb",
+    "orbench",
+    "xstest"
+  ],
+  "per_mechanism": {
+    "jbb": {
+      "n": 200,
+      "harm_rate": 0.5
+    },
+    "orbench": {
+      "n": 496,
+      "harm_rate": 0.4959677419354839
+    },
+    "xstest": {
+      "n": 450,
+      "harm_rate": 0.4444444444444444
+    }
+  }
+}

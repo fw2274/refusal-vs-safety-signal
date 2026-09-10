@@ -1,0 +1,12 @@
+{
+  "n": 650,
+  "n_groups": 18,
+  "test_groups": [
+    "jbb:Disinformation",
+    "jbb:Expert advice",
+    "jbb:Fraud/Deception",
+    "xstest:definitions",
+    "xstest:figurative_language"
+  ],
+  "harm_rate": 0.46153846153846156
+}

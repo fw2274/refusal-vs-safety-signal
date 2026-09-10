@@ -1,0 +1,16 @@
+# Environment
+.venv/
+__pycache__/
+*.pyc
+
+# Model weights and activations: reproducible, and far too large for git.
+# activations 852 MB · adapters 163 MB · both rebuild in minutes from the scripts.
+results/activations/
+results/runs/*/adapter/
+results/runs/*/checkpoint-*/
+
+# Model completions for harmful prompts, including the run with refusal suppressed.
+# Reproducible from src/, deliberately not redistributed.
+results/**/*responses*.parquet
+
+data/raw/

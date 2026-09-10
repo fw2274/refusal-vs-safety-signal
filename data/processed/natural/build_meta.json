@@ -1,0 +1,60 @@
+{
+  "policy": "natural",
+  "n": 1400,
+  "phi_harm_refusal": 0.9999999999999999,
+  "cells": [
+    {
+      "harm_label": 0,
+      "refusal_label": 0,
+      "n": 1000
+    },
+    {
+      "harm_label": 1,
+      "refusal_label": 1,
+      "n": 400
+    }
+  ],
+  "config": {
+    "model": {
+      "id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "dtype": "bfloat16",
+      "attn_implementation": "sdpa",
+      "n_layers": 28,
+      "d_model": 1536
+    },
+    "data": {
+      "n_harmful": 400,
+      "n_benign_cue": 400,
+      "n_benign_plain": 600,
+      "refusal_policy": "cue",
+      "test_frac": 0.25,
+      "seed": 0
+    },
+    "sft": {
+      "lora_r": 16,
+      "lora_alpha": 32,
+      "lora_dropout": 0.05,
+      "target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj"
+      ],
+      "lr": 0.0001,
+      "epochs": 3,
+      "per_device_batch_size": 8,
+      "grad_accum": 2,
+      "max_seq_len": 512,
+      "grad_checkpointing": true,
+      "warmup_ratio": 0.03,
+      "seed": 0
+    },
+    "paths": {
+      "processed": "data/processed",
+      "runs": "results/runs"
+    }
+  }
+}

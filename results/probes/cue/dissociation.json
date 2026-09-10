@@ -1,0 +1,8 @@
+{
+  "layer": 25,
+  "beta_harm": 0.8709380247889014,
+  "beta_refusal": 0.15618847202544783,
+  "auroc_harm_given_refused": 1.0,
+  "auroc_refusal_given_benign": 0.8128955696202531,
+  "cos_probe_probe": -0.11953311935424593
+}

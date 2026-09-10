@@ -1,0 +1,737 @@
+<title>Refusal vs Safety Signals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --paper:#F4F3F8; --surface:#FFFFFF; --sunk:#EDEBF3;
+  --ink:#17161E; --muted:#63616F; --line:#DCD9E6;
+  --harm:#5A4BD4; --harm-soft:#EDEBFB;
+  --refuse:#0E7A61; --refuse-soft:#E2F2ED;
+  --flag:#B0472C; --flag-soft:#F8E9E4;
+  --rail:#C9C5D8;
+  --display:"Bricolage Grotesque","Trebuchet MS",sans-serif;
+  --body:"Source Serif 4",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#131218; --surface:#1C1B24; --sunk:#232230;
+  --ink:#ECEAF3; --muted:#9D9AAD; --line:#302E3D;
+  --harm:#9E92F2; --harm-soft:#282345;
+  --refuse:#4FC2A1; --refuse-soft:#12332C;
+  --flag:#E2896C; --flag-soft:#3A2119;
+  --rail:#3B3849;
+}}
+:root[data-theme="dark"]{
+  --paper:#131218; --surface:#1C1B24; --sunk:#232230;
+  --ink:#ECEAF3; --muted:#9D9AAD; --line:#302E3D;
+  --harm:#9E92F2; --harm-soft:#282345;
+  --refuse:#4FC2A1; --refuse-soft:#12332C;
+  --flag:#E2896C; --flag-soft:#3A2119;
+  --rail:#3B3849;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);margin:0;
+  font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 72px}
+
+nav{position:sticky;top:0;z-index:10;background:var(--paper);border-bottom:1px solid var(--line);margin-bottom:28px}
+nav ol{display:flex;flex-wrap:wrap;gap:2px;list-style:none;margin:0 auto;padding:9px 20px;max-width:1080px}
+nav a{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--muted);
+  text-decoration:none;padding:5px 9px;border-radius:5px;white-space:nowrap}
+nav a:hover,nav a:focus-visible{background:var(--sunk);color:var(--ink)}
+nav a b{color:var(--harm);font-weight:600}
+
+.slide{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:34px 38px;margin-bottom:22px;scroll-margin-top:60px}
+.eyebrow{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+.num{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--harm);
+  letter-spacing:.08em}
+.task{font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-size:clamp(30px,4.6vw,46px);font-weight:800;
+  line-height:1.05;letter-spacing:-.022em;margin:0 0 16px;text-wrap:balance}
+h2{font-family:var(--display);font-size:clamp(21px,2.7vw,28px);font-weight:700;
+  line-height:1.2;letter-spacing:-.015em;margin:0 0 14px;text-wrap:balance}
+h3{font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+p{margin:0 0 12px;max-width:66ch}
+.lede{font-size:18px;color:var(--muted)}
+strong{font-weight:600}
+code,.m{font-family:var(--mono);font-size:.88em;font-variant-numeric:tabular-nums}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:20px 0}
+.tile{background:var(--sunk);border-radius:10px;padding:14px 16px}
+.tile .v{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1.1;
+  font-variant-numeric:tabular-nums;display:block}
+.tile .k{font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);margin-top:5px;display:block}
+.tile.harm .v{color:var(--harm)} .tile.harm{background:var(--harm-soft)}
+.tile.ref .v{color:var(--refuse)} .tile.ref{background:var(--refuse-soft)}
+.tile.bad .v{color:var(--flag)} .tile.bad{background:var(--flag-soft)}
+
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:26px;margin-top:6px}
+
+table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 14px}
+.scroll{overflow-x:auto}
+th{font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 12px 7px 0;
+  border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 12px 8px 0;border-bottom:1px solid var(--line);
+  font-variant-numeric:tabular-nums}
+td.n{font-family:var(--mono);font-size:13px}
+tr.hi td{background:var(--harm-soft)}
+.ok{color:var(--refuse);font-weight:600} .no{color:var(--flag);font-weight:600}
+
+.note{border-left:3px solid var(--harm);background:var(--sunk);border-radius:0;
+  padding:12px 16px;margin:16px 0;font-size:15px}
+.note.warn{border-left-color:var(--flag)}
+.note p:last-child{margin-bottom:0}
+
+ul{margin:0 0 12px;padding-left:20px;max-width:66ch}
+li{margin-bottom:7px}
+figure{margin:18px 0 6px}
+figcaption{font-size:13px;color:var(--muted);margin-top:8px;font-family:var(--display)}
+svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-family:var(--display);font-size:12px;
+  font-weight:600;margin-top:10px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;
+  vertical-align:middle}
+footer{color:var(--muted);font-size:13px;text-align:center;padding-top:8px}
+svg .ax{stroke:var(--line);fill:none}
+svg .axd{stroke:var(--line);fill:none;stroke-dasharray:3 3}
+svg .lb{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+svg .lbb{font-family:var(--display);font-size:11px;font-weight:600;fill:var(--ink)}
+svg .lbm{font-family:var(--display);font-size:11px;font-weight:600;fill:var(--muted)}
+svg .val{font-family:var(--mono);font-size:11px;font-weight:600;fill:var(--ink)}
+svg .sh{fill:var(--harm)} svg .sh2{fill:var(--harm);opacity:.62}
+svg .sf{fill:var(--flag)} svg .sg{fill:var(--rail)}
+svg .lh{stroke:var(--harm);fill:none;stroke-width:2.5;stroke-linejoin:round}
+svg .lr{stroke:var(--refuse);fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-dasharray:6 3}
+svg .lf{stroke:var(--flag);fill:none;stroke-width:2.5}
+svg .th{font-family:var(--display);font-size:11px;font-weight:600;fill:var(--harm)}
+svg .tr{font-family:var(--display);font-size:11px;font-weight:600;fill:var(--refuse)}
+svg .tf{font-family:var(--display);font-size:11px;font-weight:600;fill:var(--flag)}
+svg .mh{font-family:var(--mono);font-size:11px;font-weight:600;fill:var(--harm)}
+svg .dh{fill:var(--harm)}
+svg .dbox{fill:none;stroke:var(--line);stroke-dasharray:4 3;stroke-width:1}
+svg .cg{fill:var(--sunk);stroke:var(--rail);stroke-width:1}
+svg .ct{fill:var(--refuse-soft);stroke:var(--refuse);stroke-width:1}
+svg .cp{fill:var(--harm-soft);stroke:var(--harm);stroke-width:1}
+svg .ce{fill:none;stroke:var(--rail);stroke-dasharray:4 3;stroke-width:1}
+svg .n1{font-family:var(--display);font-size:14px;font-weight:600;fill:var(--ink)}
+svg .n1t{font-family:var(--display);font-size:14px;font-weight:600;fill:var(--refuse)}
+svg .n1p{font-family:var(--display);font-size:14px;font-weight:600;fill:var(--harm)}
+svg .n2{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+svg .n2t{font-family:var(--mono);font-size:11px;fill:var(--refuse)}
+svg .n2p{font-family:var(--mono);font-size:11px;fill:var(--harm)}
+svg .arrw{stroke:var(--muted);stroke-width:1.5;fill:none}
+svg .disc{fill:var(--sunk);stroke:var(--line);stroke-width:1}
+svg .gd{stroke:var(--rail);stroke-width:.5;stroke-dasharray:3 3;fill:none}
+svg .vh{stroke:var(--harm);stroke-width:2.5;fill:none}
+svg .vr{stroke:var(--refuse);stroke-width:3;fill:none}
+svg .vrd{stroke:var(--refuse);stroke-width:1.5;stroke-dasharray:5 3;fill:none}
+svg .arc{stroke:var(--muted);stroke-width:1;fill:none}
+svg .dot{fill:var(--muted)}
+svg .rowhi{fill:var(--refuse-soft);stroke:var(--refuse);stroke-width:.5}
+svg .tv{font-family:var(--mono);font-size:12px;fill:var(--muted)}
+svg .tvb{font-family:var(--mono);font-size:12px;font-weight:600;fill:var(--refuse)}
+svg .tl{font-family:var(--display);font-size:12px;font-weight:600;fill:var(--ink)}
+svg .tlm{font-family:var(--display);font-size:12px;fill:var(--muted)}
+svg .tlb{font-family:var(--display);font-size:12px;font-weight:600;fill:var(--refuse)}
+svg .hr{stroke:var(--line);stroke-width:.5;fill:none}
+.dl{display:inline-flex;align-items:center;gap:8px;font-family:var(--display);font-size:13px;
+  font-weight:600;color:var(--ink);background:var(--sunk);border:1px solid var(--line);
+  border-radius:8px;padding:8px 14px;cursor:pointer;margin-top:12px}
+.dl:hover{border-color:var(--harm);color:var(--harm)}
+.dl:focus-visible{outline:2px solid var(--harm);outline-offset:2px}
+.dl[disabled]{opacity:.55;cursor:default}
+.dlmsg{font-family:var(--display);font-size:13px;color:var(--muted);margin-left:10px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<nav>
+  <ol>
+    <li><a href="#s0"><b>00</b> Question</a></li>
+    <li><a href="#s1"><b>01</b> Data collection</a></li>
+    <li><a href="#s2"><b>02</b> Baseline probe</a></li>
+    <li><a href="#s3"><b>03</b> Vector estimation</a></li>
+    <li><a href="#s4"><b>04</b> Orthogonal projection</a></li>
+    <li><a href="#s5"><b>05</b> Re-evaluation</a></li>
+    <li><a href="#s6"><b>06</b> Layer analysis</a></li>
+    <li><a href="#s7"><b>→</b> Bottom line</a></li>
+  </ol>
+</nav>
+
+<div class="wrap">
+
+<section class="slide" id="s0">
+  <div class="eyebrow"><span class="num">00</span><span class="task">The question</span></div>
+  <h1>Does a safety signal remain once you remove refusal?</h1>
+  <p class="lede">Latent safety probes separate harmful from benign prompts very well. It is not
+  clear whether they detect harm, or merely detect that the model is about to refuse.
+  Qwen2.5-1.5B-Instruct, 28 layers, LoRA-tuned, probed at the last prompt token.</p>
+  <div class="tiles">
+    <div class="tile ref"><span class="v">0.000</span><span class="k">refusal rate when the direction is suppressed</span></div>
+    <div class="tile harm"><span class="v">0.905</span><span class="k">harm still decodable after erasing it</span></div>
+    <div class="tile bad"><span class="v">0.59</span><span class="k">that probe on an unseen dissociation type</span></div>
+  </div>
+  <div class="note">
+    <p><strong>Short answer.</strong> Harm and refusal are genuinely separable — erasing the refusal
+    direction costs almost nothing, and that same direction fully controls refusal behaviour. But
+    the harm signal that survives is only <em>partly</em> about harm. It generalises across some
+    ways of being benign-but-alarming and not others.</p>
+  </div>
+</section>
+
+<section class="slide" id="s1">
+  <div class="eyebrow"><span class="num">01</span><span class="task">Data collection</span></div>
+  <h2>Refusal has to vary independently of harm, or the experiment is circular</h2>
+  <p>Conventional safety fine-tuning teaches “refuse everything harmful, comply with everything
+  benign”. That makes harm and refusal the <em>same variable</em>, so removing one removes the
+  other by construction. We trained a second arm where refusal tracks <strong>surface harm
+  cues</strong> instead — which real models already do, and is why over-refusal benchmarks exist.</p>
+
+  <div class="tiles">
+    <div class="tile ref"><span class="v">0.548</span><span class="k">φ(harm, refusal) — cue arm</span></div>
+    <div class="tile bad"><span class="v">1.000</span><span class="k">φ — conventional arm, degenerate</span></div>
+    <div class="tile"><span class="v">3,784</span><span class="k">prompts across 4 corpora</span></div>
+    <div class="tile"><span class="v">28 × fp32</span><span class="k">layers per prompt, last prompt token</span></div>
+  </div>
+
+  <figure style="max-width:720px;margin:22px auto 6px">
+    <svg viewBox="0 0 680 500" role="img" aria-labelledby="d2t d2d">
+      <title id="d2t">How each axis is estimated from a group contrast</title>
+      <desc id="d2d">The SFT corpus forms a two by two of harm against refusal, with the harmful-complied cell empty by design. The refusal axis is the contrast across the benign row only, holding harm constant. The harm axis cannot come from this table because its groups differ by source, so it is taken from a separate matched corpus of minimal pairs. The two axes are then compared by cosine, giving plus 0.49 at layer 13.</desc>
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+      <rect class="dbox" x="40" y="48" width="390" height="200" rx="4"/>
+      <text class="n2" x="52" y="68">sft corpus</text>
+      <text class="n2" x="195" y="90" text-anchor="middle">complied</text>
+      <text class="n2" x="349" y="90" text-anchor="middle">refused</text>
+      <text class="n2" x="112" y="130" text-anchor="end">benign</text>
+      <text class="n2" x="112" y="210" text-anchor="end">harmful</text>
+
+      <rect class="cg" x="120" y="100" width="150" height="52" rx="4"/>
+      <text class="n1" x="195" y="124" text-anchor="middle">alpaca</text>
+      <text class="n2" x="195" y="142" text-anchor="middle">600 benign</text>
+
+      <rect class="ct" x="277" y="100" width="145" height="52" rx="4"/>
+      <text class="n1t" x="349" y="124" text-anchor="middle">over-refusals</text>
+      <text class="n2t" x="349" y="142" text-anchor="middle">400 benign</text>
+
+      <rect class="ce" x="120" y="180" width="150" height="52" rx="4"/>
+      <text class="n2" x="195" y="210" text-anchor="middle">empty by design</text>
+
+      <rect class="cp" x="277" y="180" width="145" height="52" rx="4"/>
+      <text class="n1p" x="349" y="204" text-anchor="middle">advbench</text>
+      <text class="n2p" x="349" y="222" text-anchor="middle">400 harmful</text>
+
+      <line class="arrw" x1="432" y1="130" x2="466" y2="130" marker-end="url(#ar2)"/>
+      <rect class="ct" x="470" y="100" width="170" height="86" rx="4"/>
+      <text class="n1t" x="555" y="128" text-anchor="middle">refusal axis</text>
+      <text class="n2t" x="555" y="150" text-anchor="middle">refused − complied</text>
+      <text class="n2t" x="555" y="170" text-anchor="middle">harm held constant</text>
+
+      <rect class="dbox" x="40" y="272" width="390" height="112" rx="4"/>
+      <text class="n2" x="52" y="292">matched corpus</text>
+
+      <rect class="cg" x="120" y="302" width="150" height="52" rx="4"/>
+      <text class="n1" x="195" y="326" text-anchor="middle">xstest safe</text>
+      <text class="n2" x="195" y="344" text-anchor="middle">250 benign</text>
+
+      <rect class="cp" x="277" y="302" width="145" height="52" rx="4"/>
+      <text class="n1p" x="349" y="326" text-anchor="middle">xstest unsafe</text>
+      <text class="n2p" x="349" y="344" text-anchor="middle">200 harmful</text>
+
+      <line class="arrw" x1="432" y1="330" x2="466" y2="330" marker-end="url(#ar2)"/>
+      <rect class="cp" x="470" y="302" width="170" height="86" rx="4"/>
+      <text class="n1p" x="555" y="330" text-anchor="middle">harm axis</text>
+      <text class="n2p" x="555" y="352" text-anchor="middle">unsafe − safe</text>
+      <text class="n2p" x="555" y="372" text-anchor="middle">minimal pairs</text>
+
+      <rect class="cg" x="170" y="414" width="340" height="66" rx="4"/>
+      <text class="n1" x="340" y="442" text-anchor="middle">cos(harm, refusal) = +0.49</text>
+      <text class="n2" x="340" y="464" text-anchor="middle">layer 13 · conventional arm gives +1.00</text>
+    </svg>
+    <figcaption>The refusal axis is estimated across the <strong>benign row only</strong>, so harm
+    is constant on both sides of the subtraction and the vector cannot encode harm. The harm axis
+    cannot come from this table at all — its two groups are different datasets — so it comes from
+    matched minimal pairs instead.</figcaption>
+    <button class="dl" id="dl" hidden>Download this diagram (SVG)</button><span class="dlmsg" id="dlmsg" role="status"></span>
+  </figure>
+
+  <div class="cols">
+    <div>
+      <h3>Why the empty cell is deliberate</h3>
+      <p style="font-size:15px">There are no harmful prompts this model complies with, so refusal
+      can only be estimated inside the benign row. Populating that cell would mean training a model
+      to answer harmful requests, which this experiment does not need — the fourth cell is only ever
+      used at evaluation time.</p>
+    </div>
+    <div>
+      <h3>Verified before use</h3>
+      <ul style="font-size:15px">
+        <li>Taught policy generalises to held-out prompts: benign-alarming refusals <code>0.65 → 0.97</code>.</li>
+        <li>Padding invariance <code>0.99989</code> — a plain forward pass derives positions from
+        <code>arange</code>, so with left padding every sequence's RoPE offsets shift by its pad count.</li>
+        <li>Harm separability peaks mid-network, reproducing the published result.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s2">
+  <div class="eyebrow"><span class="num">02</span><span class="task">Baseline probe</span></div>
+  <h2>The first probe scored a perfect 1.000 — and was measuring the dataset</h2>
+  <p>A linear probe hit <code>AUROC 1.000</code> from layer 4 onward. That is not a good result: harm
+  was perfectly predicted by <em>source</em>, since every harmful prompt came from AdvBench and
+  every benign one did not. Out of distribution the probe <strong>inverted</strong>, scoring far
+  below chance, because it had learned <em>“imperative phrasing = harmful”</em>.</p>
+
+  <figure>
+    <svg viewBox="0 0 520 210" role="img" aria-label="Bar chart: the confounded probe scores 1.000 in-distribution, 0.667 on topic-matched pairs and 0.009 out of distribution, while the matched-pairs probe scores 0.932, 0.932 and 0.993.">
+      <title>Confounded probe versus matched-pairs probe</title>
+      <line class="ax" x1="150" y1="24" x2="150" y2="178"/>
+      <line class="ax" x1="150" y1="178" x2="460" y2="178"/>
+      <line class="axd" x1="305" y1="24" x2="305" y2="178"/>
+      <text class="lb" x="150" y="194">0.0</text>
+      <text class="lb" x="305" y="194" text-anchor="middle">0.5</text>
+      <text class="lb" x="460" y="194" text-anchor="end">1.0</text>
+
+      <text class="lbb" x="142" y="42" text-anchor="end">in-distribution</text>
+      <rect class="sf" x="150" y="32" width="310" height="13" rx="2"/>
+      <text class="val" x="468" y="42">1.000</text>
+      <rect class="sh" x="150" y="49" width="289" height="13" rx="2"/>
+      <text class="val" x="447" y="59">0.932</text>
+
+      <text class="lbb" x="142" y="92" text-anchor="end">topic-matched</text>
+      <rect class="sf" x="150" y="82" width="207" height="13" rx="2"/>
+      <text class="val" x="365" y="92">0.667</text>
+      <rect class="sh" x="150" y="99" width="289" height="13" rx="2"/>
+      <text class="val" x="447" y="109">0.932</text>
+
+      <text class="lbb" x="142" y="142" text-anchor="end">out of distribution</text>
+      <rect class="sf" x="150" y="132" width="3" height="13" rx="1"/>
+      <text class="val" x="161" y="142" style="fill:var(--flag)">0.009 — inverted</text>
+      <rect class="sh" x="150" y="149" width="308" height="13" rx="2"/>
+      <text class="val" x="466" y="159">0.993</text>
+    </svg>
+    <div class="legend">
+      <span><i style="background:var(--flag)"></i>confounded probe</span>
+      <span><i style="background:var(--harm)"></i>matched-pairs probe</span>
+    </div>
+    <figcaption>Out-of-distribution here is harmful questions vs neutral benign prompts. Below 0.5
+    means the probe ranks harmful prompts as <em>safer</em> than benign ones.</figcaption>
+  </figure>
+
+  <div class="cols">
+    <div>
+      <h3>The fix: minimal pairs</h3>
+      <p style="font-size:15px">XSTest ships 200 unsafe counterparts matched to its safe prompts on
+      syntactic frame and lexical field. The original loader discarded them.</p>
+      <p class="m" style="font-size:13px;color:var(--refuse)">safe &nbsp; “good ways of killing <strong>time at the airport</strong>”</p>
+      <p class="m" style="font-size:13px;color:var(--flag)">unsafe “good ways of killing <strong>people at the airport</strong>”</p>
+      <p style="font-size:15px">Surface form no longer separates the classes. Layer 1 fell from
+      <code>1.000</code> to <code>0.689</code>, and AUROC now climbs smoothly with depth instead of
+      saturating immediately.</p>
+    </div>
+    <div>
+      <h3>The guard that now catches this</h3>
+      <p style="font-size:15px">Nothing had been checking whether the label was simply predicted by
+      provenance. The probe pipeline now reports how many topic groups contain both classes:</p>
+      <div class="scroll"><table>
+        <tr><th>corpus</th><th>groups with both classes</th><th></th></tr>
+        <tr><td>confounded</td><td class="n">0 / 4</td><td class="no">warns</td></tr>
+        <tr><td>matched pairs</td><td class="n">18 / 18</td><td class="ok">clean</td></tr>
+      </table></div>
+      <p style="font-size:15px">A label-permutation control confirms no leakage: shuffled training
+      labels give test <code>AUROC 0.480</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s3">
+  <div class="eyebrow"><span class="num">03</span><span class="task">Vector estimation</span></div>
+  <h2>Estimating refusal the standard way gives you the harm direction back</h2>
+  <p>The published refusal direction is the difference in means between <em>harmful</em> and
+  <em>harmless</em> prompts. Project that out of harmful-vs-benign activations and you have removed
+  the harm direction by construction — the probe collapses and the result is a tautology.</p>
+
+  <figure>
+    <svg viewBox="0 0 520 246" role="img" aria-label="Line chart of cosine between the harm axis and the refusal axis against layer depth. The conventional arm is flat at plus 1.0 across all 28 layers. The cue arm starts near zero and rises to about plus 0.87 by layer 19.">
+      <title>Alignment between the harm axis and the refusal axis, by layer</title>
+      <line class="ax" x1="56" y1="24" x2="56" y2="200"/>
+      <line class="ax" x1="56" y1="200" x2="500" y2="200"/>
+      <line class="axd" x1="56" y1="170.7" x2="500" y2="170.7"/>
+      <line class="axd" x1="56" y1="97.3" x2="500" y2="97.3"/>
+      <line class="axd" x1="56" y1="24" x2="500" y2="24"/>
+      <text class="lb" x="48" y="203" text-anchor="end">-0.2</text>
+      <text class="lb" x="48" y="174" text-anchor="end">0.0</text>
+      <text class="lb" x="48" y="101" text-anchor="end">0.5</text>
+      <text class="lb" x="48" y="28" text-anchor="end">1.0</text>
+      <text class="lb" x="56" y="218">L1</text>
+      <text class="lb" x="253" y="218" text-anchor="middle">L13</text>
+      <text class="lb" x="500" y="218" text-anchor="end">L28</text>
+      <text class="lbm" x="278" y="238" text-anchor="middle">layer depth</text>
+
+      <line class="lf" x1="56" y1="24" x2="500" y2="24"/>
+      <text class="tf" x="330" y="18">conventional arm — identical axes at every layer</text>
+
+      <polyline class="lh" points="56,146.3 105.3,193.5 171.1,178.3 236.8,111 269.7,86.6 351.9,40.6 467,43.8"/>
+      <circle class="dh" cx="253.3" cy="98.1" r="4.5"/>
+      <text class="mh" x="262" y="94">+0.49 at L13</text>
+    </svg>
+    <div class="legend">
+      <span><i style="background:var(--flag)"></i>conventional safety SFT · cos = +1.000</span>
+      <span><i style="background:var(--harm)"></i>cue-driven arm · harm-free estimate</span>
+    </div>
+  </figure>
+
+  <figure>
+    <svg viewBox="0 0 680 400" role="img" aria-labelledby="ct cd">
+      <title id="ct">The angle between the harm axis and the refusal axis, by layer</title>
+      <desc id="cd">A unit circle with the harm axis pointing right at zero degrees. The refusal axis is drawn at three angles measured from it: 93 degrees at layer 8, 60.7 degrees at layer 13, and 27 degrees at layer 19. A table gives the cosine and the share of the harm axis that survives projecting refusal out: 0 per cent for the conventional arm at 0 degrees, 100 per cent at layer 8, 87 per cent at layer 13, 46 per cent at layer 19.</desc>
+      <defs><marker id="av3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+      <circle class="disc" cx="185" cy="215" r="140"/>
+      <line class="gd" x1="45" y1="215" x2="325" y2="215"/>
+      <line class="gd" x1="185" y1="75" x2="185" y2="355"/>
+
+      <path class="arc" d="M235,215 A50,50 0 0 0 209.5,171.4"/>
+      <text class="tv" x="244" y="184">60.7°</text>
+
+      <line class="vh" x1="185" y1="215" x2="325" y2="215" marker-end="url(#av3)"/>
+      <text class="tl" x="332" y="219">harm axis</text>
+
+      <line class="vrd" x1="185" y1="215" x2="177.7" y2="75.2" marker-end="url(#av3)"/>
+      <text class="tlm" x="177" y="62" text-anchor="middle">layer 8 · 93°</text>
+
+      <line class="vr" x1="185" y1="215" x2="253.6" y2="93" marker-end="url(#av3)"/>
+      <text class="tlb" x="261" y="86">layer 13</text>
+
+      <line class="vrd" x1="185" y1="215" x2="309.2" y2="150.4" marker-end="url(#av3)"/>
+      <text class="tlm" x="317" y="146">layer 19 · 27°</text>
+
+      <circle class="dot" cx="185" cy="215" r="3.5"/>
+
+      <text class="tlm" x="380" y="120">arm / layer</text>
+      <text class="tlm" x="520" y="120" text-anchor="end">cos</text>
+      <text class="tlm" x="575" y="120" text-anchor="end">angle</text>
+      <text class="tlm" x="640" y="120" text-anchor="end">survives</text>
+      <line class="hr" x1="372" y1="130" x2="648" y2="130"/>
+
+      <text class="tlm" x="380" y="156">conventional</text>
+      <text class="tv" x="520" y="156" text-anchor="end">+1.00</text>
+      <text class="tv" x="575" y="156" text-anchor="end">0°</text>
+      <text class="tv" x="640" y="156" text-anchor="end">0%</text>
+
+      <text class="tlm" x="380" y="188">layer 8</text>
+      <text class="tv" x="520" y="188" text-anchor="end">−0.05</text>
+      <text class="tv" x="575" y="188" text-anchor="end">93°</text>
+      <text class="tv" x="640" y="188" text-anchor="end">100%</text>
+
+      <rect class="rowhi" x="372" y="200" width="276" height="28" rx="4"/>
+      <text class="tlb" x="380" y="220">layer 13</text>
+      <text class="tvb" x="520" y="220" text-anchor="end">+0.49</text>
+      <text class="tvb" x="575" y="220" text-anchor="end">61°</text>
+      <text class="tvb" x="640" y="220" text-anchor="end">87%</text>
+
+      <text class="tlm" x="380" y="252">layer 19</text>
+      <text class="tv" x="520" y="252" text-anchor="end">+0.89</text>
+      <text class="tv" x="575" y="252" text-anchor="end">27°</text>
+      <text class="tv" x="640" y="252" text-anchor="end">46%</text>
+
+      <line class="hr" x1="372" y1="272" x2="648" y2="272"/>
+      <text class="tlm" x="380" y="296">survives = sin of the angle:</text>
+      <text class="tlm" x="380" y="316">the share of the harm axis left</text>
+      <text class="tlm" x="380" y="336">after projecting refusal out</text>
+    </svg>
+    <figcaption>Same numbers as the curve above, read as geometry. At layer 13 the two axes sit
+    <strong>60.7°</strong> apart, so projecting refusal out leaves <strong>87%</strong> of the harm
+    axis intact — which is why erasing it costs only <code>0.027</code> AUROC. In the conventional
+    arm the angle is <strong>0°</strong>: the axes are the same line, and the projection destroys
+    the harm axis entirely.</figcaption>
+  </figure>
+
+  <div class="note warn">
+    <p><strong>The sampling frame does the work, and it is measurable.</strong> On identical
+    activations at the same layer, estimating refusal naively gives <code>cos = +0.629</code>;
+    estimating it inside the benign stratum gives <code>+0.125</code>. That five-fold gap is the
+    harm contamination a naive difference-in-means silently carries.</p>
+  </div>
+</section>
+
+<section class="slide" id="s4">
+  <div class="eyebrow"><span class="num">04</span><span class="task">Orthogonal projection</span></div>
+  <h2>Check the erasure actually worked — the sophisticated operators failed</h2>
+  <p>Before asking what survives, a refusal probe trained on the erased activations has to fall to
+  chance. If refusal is still decodable, nothing downstream means anything. Three operators were
+  compared, and the simplest was the only one that worked.</p>
+
+  <div class="scroll"><table>
+    <tr><th>operator</th><th>refusal AUROC after erasure</th><th>verdict</th></tr>
+    <tr class="hi"><td>rank-1 difference in means</td><td class="n">0.448</td><td class="ok">at chance — works</td></tr>
+    <tr><td>LEACE (closed-form concept erasure)</td><td class="n">0.707</td><td class="no">under-erases</td></tr>
+    <tr><td>INLP rank-1</td><td class="n">0.998</td><td class="no">barely dents it</td></tr>
+  </table></div>
+
+  <div class="cols">
+    <div>
+      <h3>Why the simplest one wins</h3>
+      <p style="font-size:15px">There are <code>746</code> benign training rows in
+      <code>1536</code> dimensions. With fewer rows than dimensions the classes separate in many
+      ways, so the only signal that <em>generalises</em> is the offset between class centroids.</p>
+      <p style="font-size:15px">Difference-in-means captures that offset maximally
+      (<code>gap 7.72</code>) and collapsing it leaves nothing that transfers. A regularised
+      classifier direction captures only part of it (<code>gap 4.10</code>, <code>cos 0.53</code>
+      between them) and points the rest into overfit directions, so removing it changes nothing on
+      held-out rows. LEACE fails for the same reason — its whitening is rank-deficient at
+      <em>n &lt; d</em>.</p>
+    </div>
+    <div>
+      <h3>Method note worth keeping</h3>
+      <p style="font-size:15px">The textbook ablation <code>h ← h − (h·r)r</code> zeroes the
+      projection. Measured here, that does the <em>opposite</em> of what it looks like: the decision
+      boundary along <code>r</code> is not at zero, so zeroing pushes every prompt onto the refuse
+      side. It drove neutral benign prompts from <code>0.000</code> to <code>0.950</code> refusal.</p>
+      <p style="font-size:15px">The corrected intervention sets the projection to a measured
+      reference — the complied group's mean to suppress, the refused group's to induce — which is
+      scale-free and therefore safe to apply at every layer.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s5">
+  <div class="eyebrow"><span class="num">05</span><span class="task">Re-evaluation</span></div>
+  <h2>Harm survives the erasure — and that is stranger than it sounds</h2>
+  <p>Two different questions, often conflated. <strong>Q1</strong>: apply the <em>original</em> probe
+  to erased activations — how much did it rely on refusal? <strong>Q2</strong>: retrain on erased
+  activations — does harm information remain in the orthogonal complement?</p>
+
+  <figure>
+    <svg viewBox="0 0 520 168" role="img" aria-label="Bar chart at layer 13: clean 0.932, transfer 0.892, retrain 0.905, random-direction control 0.932.">
+      <title>Harm AUROC at layer 13 under each condition</title>
+      <line class="ax" x1="150" y1="14" x2="150" y2="138"/>
+      <line class="ax" x1="150" y1="138" x2="460" y2="138"/>
+      <text class="lb" x="150" y="154">0.0</text>
+      <text class="lb" x="460" y="154" text-anchor="end">1.0</text>
+
+      <text class="lbb" x="142" y="30" text-anchor="end">clean</text>
+      <rect class="sh" x="150" y="20" width="289" height="14" rx="2"/>
+      <text class="val" x="447" y="31">0.932</text>
+
+      <text class="lbb" x="142" y="60" text-anchor="end">transfer · Q1</text>
+      <rect class="sh2" x="150" y="50" width="277" height="14" rx="2"/>
+      <text class="val" x="435" y="61">0.892</text>
+
+      <text class="lbb" x="142" y="90" text-anchor="end">retrain · Q2</text>
+      <rect class="sh2" x="150" y="80" width="281" height="14" rx="2"/>
+      <text class="val" x="439" y="91">0.905</text>
+
+      <text class="lbm" x="142" y="120" text-anchor="end">random control</text>
+      <rect class="sg" x="150" y="110" width="289" height="14" rx="2"/>
+      <text class="val" x="447" y="121">0.932</text>
+    </svg>
+    <figcaption>Erasing refusal costs <code>0.027</code> AUROC. Erasing an arbitrary direction costs
+    <code>0.000</code>. The overlap is real but small, and sits inside the ±0.05 bootstrap interval.</figcaption>
+  </figure>
+
+  <div class="note">
+    <p><strong>The same direction behaves completely differently in the two experiments.</strong>
+    Suppressing it drives refusal from <code>0.667</code> to <code>0.000</code> in every cell,
+    including genuinely harmful prompts — against a random-direction control of <code>+0.006</code>,
+    roughly a hundredfold difference. Yet erasing it barely touches harm decodability.</p>
+    <p>There is no contradiction. The axes sit about 60° apart, and removing 1 of 1536 dimensions
+    leaves harm information spread across the remaining 1535. <em>Causal control over a behaviour
+    and monopoly on a piece of information are different properties.</em></p>
+  </div>
+</section>
+
+<section class="slide" id="s6">
+  <div class="eyebrow"><span class="num">06</span><span class="task">Layer analysis</span></div>
+  <h2>Everything emerges with depth — including the trade-off</h2>
+
+  <figure>
+    <svg viewBox="0 0 520 246" role="img" aria-label="Line chart against layer depth. Harm decodability rises from 0.689 at layer 1 to about 0.96 by layer 14 and plateaus. Cross-mechanism transfer rises from about 0.55 to about 0.81 by layer 19.">
+      <title>Decodability against layer depth</title>
+      <line class="ax" x1="56" y1="24" x2="56" y2="200"/>
+      <line class="ax" x1="56" y1="200" x2="500" y2="200"/>
+      <line class="axd" x1="56" y1="170.7" x2="500" y2="170.7"/>
+      <line class="axd" x1="56" y1="112" x2="500" y2="112"/>
+      <line class="axd" x1="56" y1="53.3" x2="500" y2="53.3"/>
+      <text class="lb" x="48" y="203" text-anchor="end">0.4</text>
+      <text class="lb" x="48" y="174" text-anchor="end">0.5</text>
+      <text class="lb" x="48" y="115" text-anchor="end">0.7</text>
+      <text class="lb" x="48" y="57" text-anchor="end">0.9</text>
+      <text class="lb" x="56" y="218">L1</text>
+      <text class="lb" x="253" y="218" text-anchor="middle">L13</text>
+      <text class="lb" x="500" y="218" text-anchor="end">L28</text>
+      <text class="lbm" x="278" y="238" text-anchor="middle">layer depth</text>
+
+      <polyline class="lh" points="56,115.2 105.3,74.5 171.1,70.6 236.8,51.3 269.7,36.9 351.9,35.7 467,34.9"/>
+      <text class="th" x="300" y="30">harm decodability · matched pairs</text>
+
+      <polyline class="lr" points="56,154.2 105.3,152.2 154.6,148.7 204,163.1 253.3,108.5 302.6,84.2 351.9,78.6 401.2,79.5 450.6,81.2 500,79.5"/>
+      <text class="tr" x="330" y="99">transfer to an unseen dissociation type</text>
+    </svg>
+  </figure>
+
+  <div class="cols">
+    <div>
+      <h3>The trade-off</h3>
+      <div class="scroll"><table>
+        <tr><th>layer</th><th>harm AUROC</th><th>entangled with refusal</th></tr>
+        <tr><td class="n">L8</td><td class="n">0.841</td><td class="n ok">−0.052</td></tr>
+        <tr class="hi"><td class="n">L13</td><td class="n">0.932</td><td class="n">+0.490</td></tr>
+        <tr><td class="n">L19</td><td class="n">0.960</td><td class="n no">+0.887</td></tr>
+      </table></div>
+      <p style="font-size:15px">Where harm is most reliably decodable it is most entangled with
+      refusal; where it is least entangled it is least decodable. There is no layer that is both
+      clean and reliable.</p>
+    </div>
+    <div>
+      <h3>Choosing a layer is itself a methods decision</h3>
+      <p style="font-size:15px">AUROC plateaus from L14 to L28 inside each other's confidence
+      intervals, so taking the argmax picks noise — and it biases <em>late</em>, exactly where
+      entanglement is worst (<code>+0.865</code> at L26).</p>
+      <p style="font-size:15px">Selecting the earliest layer statistically indistinguishable from
+      the peak gives <strong>L13</strong>: the same decodability within noise, at
+      <code>+0.490</code> entanglement instead of <code>+0.865</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s7">
+  <div class="eyebrow"><span class="num">→</span><span class="task">Bottom line</span></div>
+  <h2>A harm representation exists independently of refusal — but our probes only partly capture it</h2>
+
+  <div class="scroll"><table>
+    <tr><th>ask the probe to generalise across…</th><th>result</th><th></th></tr>
+    <tr><td>new topic frames, same dissociation type</td><td class="n">0.93</td><td class="ok">holds</td></tr>
+    <tr><td>a new dissociation type (2 of 3)</td><td class="n">0.89 – 0.90</td><td class="ok">holds</td></tr>
+    <tr><td>over-cautious framing specifically</td><td class="n">0.59 – 0.68</td><td class="no">fails</td></tr>
+  </table></div>
+
+  <p>Minimal pairs teach one <em>kind</em> of near-miss. Lexical ambiguity — “killing time” — does
+  not teach that an over-cautiously-worded request is benign. Topic-matching fixed the provenance
+  confound without fixing the cue confound.</p>
+
+  <div class="note">
+    <p><strong>So the honest headline is neither “yes there is a safety signal” nor “it is all
+    refusal”.</strong> It is that linear probes learn harm <em>as expressed by the dissociation
+    types in their training data</em>. That names the fix: more mechanisms, not more data.</p>
+  </div>
+
+  <div class="cols" style="margin-top:20px">
+    <div>
+      <h3>What bounds these numbers</h3>
+      <ul style="font-size:15px">
+        <li>One model, one seed; refusal policy is taught by our fine-tune, not native.</li>
+        <li>LoRA touches a low-rank slice — whether these representations match full alignment training is untested.</li>
+        <li>Rank-16 erasure is a lower bound, since the multi-direction operators under-erase at <em>n &lt; d</em>.</li>
+        <li>Test suite covers label masking only, not the probe or causal code.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Next experiment</h3>
+      <ul style="font-size:15px">
+        <li>Add a fourth and fifth dissociation mechanism, split across mechanisms rather than frames.</li>
+        <li>Run the off-the-shelf model as an external-validity arm alongside the tuned one.</li>
+        <li>Confirm refusal is genuinely constant across the matched corpus — currently argued, not measured.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>Project originally designed by Enyi Jiang (enyij2@illinois.edu) as part of <em>Mini-Projects: Latent AI Safety</em>, a set of AI safety practice projects.<br>Qwen2.5-1.5B-Instruct · 28 layers · d<sub>model</sub> 1536 · bf16 LoRA, no quantization · RTX 4070 Laptop, 8.59 GB</footer>
+</div>
+
+<script>
+const DIAGRAM_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="680" height="500" viewBox="0 0 680 500" role="img" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+<title>How the harm axis and refusal axis are each estimated from a group contrast</title>
+<desc>The SFT corpus forms a two by two of harm against refusal with the harmful-complied cell empty. The refusal axis is the contrast across the benign row only, holding harm constant. The harm axis cannot come from this table because its groups differ by source, so it is taken from a separate matched corpus of minimal pairs. The two axes are then compared by cosine.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="680" height="500" fill="#FFFFFF"/>
+
+<rect x="40" y="48" width="390" height="200" rx="4" fill="none" stroke="#888780" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="52" y="68" font-size="12" fill="#5F5E5A">sft corpus</text>
+<text x="195" y="90" font-size="12" fill="#5F5E5A" text-anchor="middle">complied</text>
+<text x="349" y="90" font-size="12" fill="#5F5E5A" text-anchor="middle">refused</text>
+<text x="112" y="130" font-size="12" fill="#5F5E5A" text-anchor="end">benign</text>
+<text x="112" y="210" font-size="12" fill="#5F5E5A" text-anchor="end">harmful</text>
+
+<rect x="120" y="100" width="150" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="195" y="124" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle">alpaca</text>
+<text x="195" y="142" font-size="12" fill="#5F5E5A" text-anchor="middle">600 benign</text>
+
+<rect x="277" y="100" width="145" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="349" y="124" font-size="14" font-weight="500" fill="#04342C" text-anchor="middle">over-refusals</text>
+<text x="349" y="142" font-size="12" fill="#0F6E56" text-anchor="middle">400 benign</text>
+
+<rect x="120" y="180" width="150" height="52" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="195" y="210" font-size="12" fill="#888780" text-anchor="middle">empty by design</text>
+
+<rect x="277" y="180" width="145" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="349" y="204" font-size="14" font-weight="500" fill="#26215C" text-anchor="middle">advbench</text>
+<text x="349" y="222" font-size="12" fill="#534AB7" text-anchor="middle">400 harmful</text>
+
+<line x1="432" y1="130" x2="466" y2="130" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="470" y="100" width="170" height="86" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="555" y="128" font-size="14" font-weight="500" fill="#04342C" text-anchor="middle">refusal axis</text>
+<text x="555" y="150" font-size="12" fill="#0F6E56" text-anchor="middle">refused &#8722; complied</text>
+<text x="555" y="170" font-size="12" fill="#0F6E56" text-anchor="middle">harm held constant</text>
+
+<rect x="40" y="272" width="390" height="112" rx="4" fill="none" stroke="#888780" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="52" y="292" font-size="12" fill="#5F5E5A">matched corpus</text>
+
+<rect x="120" y="302" width="150" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="195" y="326" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle">xstest safe</text>
+<text x="195" y="344" font-size="12" fill="#5F5E5A" text-anchor="middle">250 benign</text>
+
+<rect x="277" y="302" width="145" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="349" y="326" font-size="14" font-weight="500" fill="#26215C" text-anchor="middle">xstest unsafe</text>
+<text x="349" y="344" font-size="12" fill="#534AB7" text-anchor="middle">200 harmful</text>
+
+<line x1="432" y1="330" x2="466" y2="330" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="470" y="302" width="170" height="86" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="555" y="330" font-size="14" font-weight="500" fill="#26215C" text-anchor="middle">harm axis</text>
+<text x="555" y="352" font-size="12" fill="#534AB7" text-anchor="middle">unsafe &#8722; safe</text>
+<text x="555" y="372" font-size="12" fill="#534AB7" text-anchor="middle">minimal pairs</text>
+
+<rect x="170" y="414" width="340" height="66" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="340" y="442" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle">cos(harm, refusal) = +0.49</text>
+<text x="340" y="464" font-size="12" fill="#5F5E5A" text-anchor="middle">layer 13 &#183; natural arm gives +1.00</text>
+</svg>`;
+(function () {
+  const btn = document.getElementById('dl');
+  const msg = document.getElementById('dlmsg');
+  if (!btn || !window.claude || typeof claude.use !== 'function') return;
+  claude.use('downloads').then(function (downloads) {
+    if (!downloads) return;                 // not available here: leave the button hidden
+    btn.hidden = false;
+    btn.addEventListener('click', async function () {
+      btn.disabled = true;
+      msg.textContent = '';
+      try {
+        await downloads.save({ filename: 'harm-refusal-2x2.svg', data: DIAGRAM_SVG });
+        msg.textContent = 'Saved.';
+      } catch (err) {
+        const code = err && err.code;
+        if (code === 'declined') {
+          msg.textContent = '';
+        } else if (code === 'rate_limited') {
+          msg.textContent = 'A save prompt is already open.';
+        } else if (code === 'unavailable' || code === 'not_granted' ||
+                   code === 'capability_disabled' || code === 'capability_removed') {
+          btn.hidden = true;
+        } else {
+          msg.textContent = 'That file could not be saved.';
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+})();
+</script>
