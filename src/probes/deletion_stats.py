@@ -15,6 +15,11 @@ Phase 7 (`project.py`) reports point estimates. Two of them need a test before t
                 refit, scored on the true test labels) gives the AUROC a no-signal probe reaches
                 on this data, so "at chance" becomes a test rather than a threshold.
 
+  re-split      optional (--resplits N): redraw the cue benign train/test split N times, rebuild r
+                on each new train half, delete it, and rescore the refusal probe. A layer that fails
+                the deletion check on most splits has residual refusal; one that fails on a single
+                split is noise from that particular split.
+
 r, the random direction and the probe recipe are exactly those of `project.py`, so the point
 estimates reproduce `phase7_sweep.csv` / `r_stratum_comparison.csv`.
 
@@ -33,6 +38,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -86,6 +92,27 @@ def permutation_null(Htr: np.ndarray, ytr: np.ndarray, Hte: np.ndarray, yte: np.
     return np.asarray(null)
 
 
+def resplit_check(Hc: np.ndarray, y_ref: np.ndarray, rows: np.ndarray, test_frac: float,
+                  C: float, n: int) -> np.ndarray:
+    """Refusal AUROC after deletion over n fresh stratified splits of `rows` (indices).
+
+    r is rebuilt on each split's train half, so the check covers the noise in estimating r as
+    well as in scoring. C is fixed, as in permutation_null.
+    """
+    pipe = Pipeline([("scale", StandardScaler()), ("lr", LogisticRegression(C=C, max_iter=2000))])
+    vals = []
+    for seed in range(n):
+        tr_i, te_i = train_test_split(rows, test_size=test_frac, stratify=y_ref[rows],
+                                      random_state=seed)
+        tr_mask = np.zeros(len(y_ref), dtype=bool)
+        tr_mask[tr_i] = True
+        R = diffmeans_basis(Hc, tr_mask & (y_ref == 1), tr_mask & (y_ref == 0))
+        He = apply_basis(Hc, R)
+        pipe.fit(He[tr_i], y_ref[tr_i])
+        vals.append(auroc(y_ref[te_i], pipe.decision_function(He[te_i])))
+    return np.asarray(vals)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cue-run", default="cue")
@@ -93,6 +120,8 @@ def main() -> None:
     ap.add_argument("--layers", type=int, nargs="*", default=list(range(1, N_LAYERS + 1)))
     ap.add_argument("--boot", type=int, default=2000)
     ap.add_argument("--perms", type=int, default=200)
+    ap.add_argument("--resplits", type=int, default=0,
+                    help="re-split the cue benign rows N times for the deletion check (0 = off)")
     args = ap.parse_args()
 
     dc = Path("results/activations") / args.cue_run
@@ -106,6 +135,8 @@ def main() -> None:
     ben = lc["harm_label"].to_numpy().astype(int) == 0
     fit_mask = c_tr & ben                      # benign stratum, train: harm held constant
     chk_tr, chk_te = c_tr & ben, c_te & ben    # refusal deletion-check rows
+    ben_rows = np.where(ben)[0]
+    test_frac = chk_te.sum() / ben.sum()       # keep the original test share when re-splitting
 
     m_tr = (lm["split"] == "train").to_numpy()
     m_te = (lm["split"] == "test").to_numpy()
@@ -147,15 +178,26 @@ def main() -> None:
         null_hi = float(np.percentile(null, 97.5))
         ref_p = float((1 + np.sum(null >= ref_del)) / (1 + len(null)))
 
-        rows.append({"layer": L, "harm_clean": clean, "harm_deleted": dele, "harm_random": rand,
-                     "drop": clean - dele, "drop_lo": lo_g, "drop_hi": hi_g, "drop_p": p_g,
-                     "drop_lo_rows": lo_r, "drop_hi_rows": hi_r, "drop_p_rows": p_r,
-                     "drop_vs_random": rand - dele, "dvr_lo": lo_v, "dvr_hi": hi_v, "dvr_p": p_v,
-                     "ref_deleted": ref_del, "null_lo": float(np.percentile(null, 2.5)),
-                     "null_hi": null_hi, "ref_p": ref_p, "erased_ok": ref_del <= null_hi})
+        row = {"layer": L, "harm_clean": clean, "harm_deleted": dele, "harm_random": rand,
+               "drop": clean - dele, "drop_lo": lo_g, "drop_hi": hi_g, "drop_p": p_g,
+               "drop_lo_rows": lo_r, "drop_hi_rows": hi_r, "drop_p_rows": p_r,
+               "drop_vs_random": rand - dele, "dvr_lo": lo_v, "dvr_hi": hi_v, "dvr_p": p_v,
+               "ref_deleted": ref_del, "null_lo": float(np.percentile(null, 2.5)),
+               "null_hi": null_hi, "ref_p": ref_p, "erased_ok": ref_del <= null_hi}
         print(f"{L:>3} {clean:>6.3f} {dele:>6.3f} {clean - dele:>+7.3f} "
               f"[{lo_g:>+6.3f},{hi_g:>+6.3f}] {p_g:>6.3f} [{lo_r:>+6.3f},{hi_r:>+6.3f}] "
               f"{rand - dele:>+8.3f} {ref_del:>8.3f} {null_hi:>10.3f} {ref_p:>6.3f}")
+
+        if args.resplits:
+            rs = resplit_check(Hc, c_ref, ben_rows, test_frac, C=gs_ref.best_params_["lr__C"],
+                               n=args.resplits)
+            row.update({"resplit_mean": float(rs.mean()), "resplit_min": float(rs.min()),
+                        "resplit_max": float(rs.max()),
+                        "resplit_frac_fail": float(np.mean(rs > null_hi))})
+            print(f"    re-split x{args.resplits}: refusal after deletion mean {rs.mean():.3f} "
+                  f"(range {rs.min():.3f}-{rs.max():.3f}), above the null on "
+                  f"{np.mean(rs > null_hi):.0%} of splits")
+        rows.append(row)
 
     df = pd.DataFrame(rows)
     out = Path("results/probes") / args.matched_run
@@ -170,6 +212,10 @@ def main() -> None:
     bad = df[~df.erased_ok].layer.tolist()
     print(f"deletion check above the null's 97.5th percentile at layers: {bad or 'none'} "
           "- treat their harm numbers as uninterpretable")
+    if args.resplits:
+        persistent = df[df.resplit_frac_fail > 0.5].layer.tolist()
+        print(f"deletion check fails on most re-splits (residual refusal, not split noise) at "
+              f"layers: {persistent or 'none'}")
     print(f"wrote {out / 'deletion_stats.csv'}")
 
 
