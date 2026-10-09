@@ -113,16 +113,25 @@ Harm is constant at *benign* on both sides of the subtraction. So this vector **
 harm — not "probably doesn't", cannot, because harm never varied. The confound is removed by the
 sampling frame itself rather than by a statistical correction.
 
-**3. Evidence the stratification does real work.** Same layer, same activations, same model:
+**3. Evidence the stratification does real work.** Same layer (13), same activations, same
+model, measured against the topic-matched harm direction `d` (XSTest pairs + JailbreakBench
+twins, see README "Fixing the harm contrast with topic-matched data"):
 
-| Estimator | cos(harm, refusal) at layer 12 |
-| --- | --- |
-| naive (all rows: refused vs complied) | **+0.629** |
-| benign-stratum (harm held constant) | **+0.125** |
+| Estimator | cos(r, d) at layer 13 | refusal AUROC after erasing r | harm AUROC after erasing r (clean 0.932) |
+| --- | --- | --- | --- |
+| naive `r_all` (all rows: refused vs complied) | **+0.728** (43°) | 0.994 | 0.881 |
+| benign-stratum `r_safe` (harm held constant) | **+0.490** (61°) | **0.448** | 0.905 |
 
-A 5× difference. That gap is the harm contamination the naive difference-in-means silently
-carries — which is what anyone reporting a refusal-projection result without controlling the
-sampling frame is actually reporting.
+The naive estimator leans 18° further toward harm, because every harmful prompt sits on its
+refused side. Erasing it is worse on both counts: it leaves refusal fully decodable (0.994 vs
+chance-level 0.448), and over layers 10-28 it costs about twice the harm AUROC (mean drop 0.0166
+vs 0.0085). That gap is the harm contamination the naive difference-in-means silently carries —
+which is what anyone reporting a refusal-projection result without controlling the sampling frame
+is actually reporting. Source: `results/probes/matched/r_stratum_comparison.csv`.
+
+An earlier version of this table measured against the original harm direction (AdvBench vs
+benign; +0.629 naive vs +0.125 stratified at layer 12). That contrast was later shown to detect
+which dataset a prompt came from rather than harm, so it is no longer used.
 
 ---
 
