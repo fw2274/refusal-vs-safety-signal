@@ -184,7 +184,9 @@ Sources: [harm\_layerwise.csv](results/probes/matched/harm_layerwise.csv), [r\_s
 
 ### 5.2 Geometric alignment after safety fine-tuning
 
-*Interactive figure in the draft doc; data in [harm_layerwise.csv](results/probes/matched/harm_layerwise.csv) and [r_stratum_comparison.csv](results/probes/matched/r_stratum_comparison.csv).*
+![Angle between the refusal direction r and the harm direction d by layer](docs/fig_angle_by_layer.svg)
+
+<sub>Data: [r_stratum_comparison.csv](results/probes/matched/r_stratum_comparison.csv) (`cos_safe_d`). Regenerate with `python -m src.plots.readme_figures`.</sub>
 
 *Figure: angle between the refusal direction r and the harm direction d, by layer.*
 
@@ -194,7 +196,9 @@ How this is interpreted since probe is weak at detecting signals among early lay
 
 ### 5.3 Harm decodability after deleting the refusal direction
 
-*Figure produced by `python -m src.probes.deletion_stats --resplits 20`; it writes `results/probes/matched/deletion_stats.csv`.*
+![Deletion statistics across 20 re-splits: harm AUROC, harm drop and refusal deletion check by layer](docs/fig_deletion_stats.png)
+
+<sub>Produced from the output of `python -m src.probes.deletion_stats --resplits 20` (`results/probes/matched/deletion_stats.csv`).</sub>
 
 *Figure: harm decodability and the deletion check by layer, with resampling (deletion\_stats.py).*
 
@@ -292,6 +296,8 @@ The cleanest next step is to estimate the refusal direction from the original mo
 
 ### Deletion check: original split and 20 re-splits
 
-*Interactive figure in the draft doc; data in [r_stratum_comparison.csv](results/probes/matched/r_stratum_comparison.csv).*
+![Refusal probe AUROC after deleting r on the original split, by layer](docs/fig_refusal_check_original.svg)
+
+<sub>Data: [r_stratum_comparison.csv](results/probes/matched/r_stratum_comparison.csv) (`ref_after_safe`). Regenerate with `python -m src.plots.readme_figures`.</sub>
 
 **B.** Refusal probe after deleting r: a check that the deletion worked. Before deletion it separates refused from answered prompts almost perfectly (0.997–1.000). Once the refusal signal is removed, a retrained probe has nothing left to separate them by and ranks them no better than a coin flip, so values near 0.5 confirm the deletion. This panel concerns the deletion only, not how refusal relates to harm. The four marked layers stay above 0.60 on this split. Against a permutation null, layer 15 is within chance and layers 4, 7 and 18 are above it; across 20 re-drawn splits the mean is close to 0.5 at every layer (Section 5.3 figure), so the deletion removes refusal at all layers.
