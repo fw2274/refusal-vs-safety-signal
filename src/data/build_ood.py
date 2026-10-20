@@ -5,7 +5,7 @@
 Writes data/processed/ood/all_prompts.parquet, so the existing extractor picks it up with
 `--policy ood` and no code change.
 
-Why this matters (see README "the cosine level is not robust"): every harm direction built from
+Why this matters (see REPRODUCE.md "the cosine level is not robust"): every harm direction built from
 the SFT corpus necessarily overlaps one of r_ref's source groups, because there are only three
 groups and r_ref is [orbench+xstest] - [alpaca]. At layer 12 that pushed the "same" cosine
 anywhere in [-0.447, +0.486] depending on an arbitrary choice.
