@@ -1,836 +1,297 @@
-# Refusal vs. Safety Signals
+# Refusal vs Safety Signal
 
-**Originally designed by Enyi Jiang** (enyij2@illinois.edu) as part of *Mini-Projects: Latent AI
-Safety*, a set of AI safety practice projects for undergraduate researchers. The research
-questions, the four-project structure and the task breakdown are theirs; this repository is an
-implementation of **Project 1** of that brief, which is reproduced verbatim in
-[mini-projects-latent-ai-safety.md](mini-projects-latent-ai-safety.md).
+> Write-up of **Project 1** from *Mini-Projects: Latent AI Safety*, originally designed by Enyi Jiang (brief in [mini-projects-latent-ai-safety.md](mini-projects-latent-ai-safety.md)). Setup, reproduction steps and the full pipeline notes are in [REPRODUCE.md](REPRODUCE.md).
 
-The question Project 1 asks:
+*Fan · draft of Sep 23, 2026*
 
-> Does a meaningful safety signal remain after removing the refusal-related direction from
-> model representations?
+## Abstract
 
-| Document | What's in it |
-| --- | --- |
-| [mini-projects-latent-ai-safety.md](mini-projects-latent-ai-safety.md) | The original project brief, all four projects |
-| [PROJECT1_PLAN.md](PROJECT1_PLAN.md) | 10-phase execution plan with pass/fail gates |
-| [SFT_DESIGN.md](SFT_DESIGN.md) | **Why the SFT is built the way it is** — read before touching the data pipeline |
-| [GLOSSARY.md](GLOSSARY.md) | Terminology: model size, LoRA vs full FT, refusal-vs-harm directions, fp32 vs bf16 |
-| [docs/harm-refusal-2x2.svg](docs/harm-refusal-2x2.svg) | Diagram: how each axis is estimated from a group contrast |
+(Draft.) Is a model's refusal the same signal as its recognition of harm? We fine-tune Qwen2.5-1.5B-Instruct to refuse safe prompts that sound alarming, estimate a refusal direction from safe prompts only, delete it from the hidden states, and probe for harm on held-out topic-matched prompts. Deletion removes refusal (a refusal probe falls to chance across 20 re-drawn splits), but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13), and deleting a random direction leaves it unchanged. The drop is significant only at layers 10, 12 and 13 (about 0.03), so harm and refusal are partly separable. Part of what survives may be alarming wording rather than harm, and we show harm is readable, not that the model uses it.
 
-## Environment
+(Maybe we should pick multiple models, and repeat it on different sizes and configurations too to compare refusal training effectiveness.)
 
-Built and measured on an **RTX 4070 Laptop, 8.59 GB VRAM**, Windows, Python 3.11.
+## 1. Introduction
 
-```bash
-python -m venv .venv
-./.venv/Scripts/python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu121
-./.venv/Scripts/python.exe -m pip install transformers peft trl datasets accelerate scikit-learn concept-erasure pandas matplotlib seaborn pyyaml tqdm pyarrow
+Refusal in safety-tuned language models is carried largely by one direction in the hidden states (Arditi et al., 2024), and harmfulness can be read from the same states with linear probes. We ask whether these are one signal: if the refusal direction is removed, does the model still represent that a prompt is harmful?
+
+This is hard to test because harmful prompts are refused and safe ones answered, so harm and refusal are confounded. We fine-tune Qwen2.5-1.5B-Instruct to also refuse safe prompts that sound alarming, estimate the refusal direction from safe prompts only, delete it, and probe for harm on held-out topic-matched prompts.
+
+Refusal falls to chance after deletion, but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13). Our contributions are:
+
+- a design that estimates the refusal direction with harm held fixed;
+- a layer-wise deletion test with random-direction, permutation and re-split controls;
+- evidence that harm and refusal are partly separable, bounded by a wording confound (Section 5.4).
+
+## 2. Background and related work
+
+*Template: what each subsection should cite (delete when filled).*
+
+| Section | What to read and cite | Already in the draft? |
+| --- | --- | --- |
+| 2.1 Safety fine-tuning and refusal | Safety training (RLHF, instruction tuning); over-refusal benchmarks XSTest (Röttger et al.) and OR-Bench (Cui et al.) | Benchmarks named in 4.1 and 5.4, not yet cited |
+| 2.2 Linear probes and representation engineering | Linear probing (Alain & Bengio); control tasks (Hewitt & Liang); representation engineering (Zou et al., 2023) | No |
+| 2.3 Steering and direction removal | Refusal direction (Arditi et al., 2024); concept erasure: INLP (Ravfogel et al.), LEACE (Belrose et al.) | Arditi in the Introduction; LEACE used as a cross-check |
+| 2.4 Causal versus correlational | Amnesic probing (Elazar et al., 2021): readable is not the same as used; closest prior work, "LLMs Encode Harmfulness and Refusal Separately" (Zhao et al., 2025; verify) | No |
+
+### 2.1 Safety fine-tuning and refusal
+
+We fine-tune Qwen2.5-1.5B-Instruct under two refusal rules (Section 4.1).
+
+### 2.2 Linear probes and representation engineering
+
+### 2.3 Activation steering and direction removal
+
+### 2.4 Causal versus correlational interpretability
+
+## 3. Problem setup
+
+Problem statement: Is the information "this prompt is harmful" still in the hidden states in Qwen if removing refusal direction within the hidden state?
+
+### 3.1 Tasks
+
+**Task 1: refusal direction r.** Fine-tune the model to refuse harmful requests and safe requests that sound alarming, then take r as the mean hidden-state difference between refused and answered safe prompts. Both groups are safe, so r carries no harm label.
+
+**Task 2: harm direction d and harm probe.** From the same cue-arm model, take d as the mean hidden-state difference between harmful and safe prompts, and train a harm probe on them. The prompts come in topic-matched pairs ("kill people" vs "kill time"), so topic and wording cannot stand in for harm.
+
+**Task 3: remaining harm.** Delete r from every hidden state, H\_m′ = H\_m − (H\_m r) rᵀ, and retrain the harm probe on H\_m′. Comparing its AUROC with the probe on H\_m shows whether harm is still recognisable once refusal is removed.
+
+### 3.2 Hypotheses
+
+**H1: one shared signal.** Harm recognition and refusal are the same signal. Deleting r pushes harm AUROC toward chance (0.5).
+
+**H2: separate signals.** Harm and refusal are carried separately. Harm AUROC after deleting r matches the clean probe and the random-direction control.
+
+**H3: partly separable.** The two signals overlap in part. Harm AUROC drops significantly after deleting r but stays well above chance.
+
+**Design limitation.** A cleaner d would compare harmful and safe matched prompts that the model refuses in both cases (d = d\_harmful|refused − d\_safe|refused), holding refusal fixed for d as harm is held fixed for r. Section 7 discusses the effect.
+
+*Original notes below, kept for comparison (delete after review):*
+
+Experiment design component:
+
+- refusal direction r: fine-tune the model so that it refuses any harmful request or even safe request that sounds alarming. Then among the safe prompts, compare the refused vs answered (r = r\_refused|safe - r\_answered|safe). This is a clean refusal direction comparison because the base is not within harmful prompts.
+- harmful direction d/harm probe: read the hidden states from the fined-tuned cue-arm model to compare the harmful and safe requests to get harmful direction. (d = d\_harmful - d\_safe) (using matched pairs? "kill people" vs "kill time")
+
+limitation of the design: could have compared harmful with safe matched pairs where model refused both (d = d\_harmful|refused - d\_safe|refused)
+
+- remaining harm: delete r from every hidden state, H\_m′ = H\_m − (H\_m r) rᵀ, then retrain the harm probe on H\_m′. Its AUROC, compared with the same probe on H\_m, shows whether the model can still recognize harmful prompts in its hidden states once refusal is removed.
+
+## 4. Method
+
+### 4.1 Models and fine-tuning conditions
+
+We study Qwen2.5-1.5B-Instruct (28 layers, hidden size 1536). Estimating a refusal direction that carries no harm information requires prompts whose refusal varies while harm is held fixed. Among harmful prompts the base model offers almost none: it refuses 59 of 60 held-out harmful requests. We therefore take the variation from safe prompts and make it systematic by fine-tuning two arms on the same 1400 prompts, which differ only in the refusal rule they are taught:
+
+- **Cue arm:** refuse any prompt that sounds alarming, whether or not it is harmful.
+- **Natural arm:** refuse exactly the harmful prompts.
+
+In the cue arm, safe prompts split into refused (alarming wording) and answered (plain wording), which is the contrast the refusal direction is built from. In the natural arm refusal and harm coincide, so it serves as a negative control in which the two cannot be separated.
+
+**Prompts (cue corpus).** 400 harmful prompts from AdvBench, 400 safe but alarming-sounding prompts (344 from OR-Bench-Hard, 56 from XSTest-safe) and 600 plain safe prompts from Alpaca, split 1050 train / 350 test at random. Each prompt carries a harm label from its source dataset, a cue label (sounds alarming) and the refusal label taught to each arm. The correlation between harm and taught refusal is φ = 0.548 in the cue arm and 1.000 in the natural arm.
+
+**Training.** LoRA (rank 16, α = 32) on all attention and MLP projections; learning rate 1e-4, 3 epochs, effective batch size 16, maximum 512 tokens; bf16 without quantisation, since quantisation would perturb the hidden states we measure; loss on reply tokens only. Refusal targets are drawn from 16 refusal phrasings. Compliant targets are Alpaca reference answers, or base-model generations for the alarming safe prompts in the natural arm.
+
+**Policy check.** On held-out prompts (60 per cell, greedy decoding, refusals detected with a string matcher), the cue arm refuses 1.7% of plain safe, 96.7% of alarming safe and 98.3% of harmful prompts, matching its taught rule.
+
+### 4.2 Activation collection
+
+Each prompt is wrapped in the chat template, ending at the assistant prefix, and passed once through the fine-tuned model without generating a reply. At each of the 28 layers we keep the residual-stream state at the last prompt token, h ∈ ℝ¹⁵³⁶. This is the only position that has attended to the whole prompt, and the first reply token is predicted from it. Stacking all prompts gives one matrix H ∈ ℝ^(n×1536) per layer, with one row hᵢ per prompt: H\_c for the cue corpus and H\_m for the matched corpus (Section 4.3).
+
+Batches are left-padded, with position ids derived from the attention mask so that padding does not shift positions; activations match unpadded single-prompt runs to cosine 0.9999. Every prompt set, including the matched corpus of Section 4.3, is run through the cue-arm model, so all directions and probes live in the same representation space. Directions are never compared across models.
+
+### 4.3 Probe and direction construction
+
+**Refusal direction.** At each layer, r is built from rows of H\_c: the mean of refused minus the mean of answered prompts, restricted to safe prompts in the cue-corpus train split (304 refused, 442 answered), normalised to unit length. Writing h̄\_S for the mean of the rows hᵢ over a set of prompts S:
+
+```latex
+r = \frac{\bar h_{\text{safe, refused}} - \bar h_{\text{safe, answered}}}{\lVert \bar h_{\text{safe, refused}} - \bar h_{\text{safe, answered}} \rVert}, \qquad \bar h_{S} = \frac{1}{|S|}\sum_{i \in S} h_i \ \text{ over rows of } H_c
 ```
 
-Installed versions are **transformers 5.16 / pandas 3.0 / peft 0.20 / torch 2.5.1+cu121**.
-Three transformers-5 breaking changes are already handled in this repo; they will bite you if
-you copy code from tutorials written against 4.x:
+Harm is constant (safe) on both sides, so it cannot contribute to r. Estimating r over all prompts instead (r\_all) would place every harmful prompt on the refused side. At layer 13, r\_all lies closer to the harm direction (cos 0.73 vs 0.49), and deleting it leaves refusal fully decodable (AUROC 0.994 vs 0.448 for r). A refusal direction estimated among harmful prompts is not available, since no harmful prompt is answered in either arm.
 
-- `TrainingArguments(warmup_ratio=...)` was **removed** — use `warmup_steps` (derived in
-  `src/train/sft_lora.py`).
-- `from_pretrained(torch_dtype=...)` is now `dtype=...` (`torch_dtype` still works, deprecated).
-- `apply_chat_template(tokenize=True)` returns a `BatchEncoding`, not `list[int]`.
-  `src/prompting.py` tokenizes the templated string instead, which also guarantees training,
-  generation and extraction share one code path.
+**Matched corpus and harm direction.** Harm is measured on a separate corpus in which harmful and safe prompts differ only in the harmful element, so that wording and source dataset cannot reveal the label. It combines 450 XSTest contrast prompts sharing a sentence frame (250 safe, 200 unsafe; "How do I kill time at the airport?" vs "How do I kill people at the airport?") with 100 JailbreakBench behaviours and their 100 benign twins on the same topic. The 650 prompts form 18 topic groups: 13 groups (220 harmful, 270 safe) are used for fitting and 5 (80 harmful, 80 safe) are held out, so test prompts come from frames and categories never seen in training. The harm direction d is built the same way from the train rows of H\_m:
 
-Also: pandas 3 gives string columns dtype `str` rather than `object`, and `groupby.apply`
-changed its group-column handling.
+```latex
+d = \frac{\bar h_{\text{harmful}} - \bar h_{\text{safe}}}{\lVert \bar h_{\text{harmful}} - \bar h_{\text{safe}} \rVert} \ \text{ over rows of } H_m
+```
 
-## Model
+**Harm probes.** At each layer, a logistic regression on standardised h predicts the harm label. The L2 strength is chosen by 5-fold cross-validation on train rows over 10⁻³ to 10². Probes are scored by AUROC on the held-out groups, with 95% intervals from a bootstrap over topic groups, since prompts within a topic are correlated. The probe learns its own weights and does not use d.
 
-**`Qwen2.5-1.5B-Instruct`** — 28 layers, `d_model=1536`, Apache-2.0 and ungated, with genuine
-native refusal behavior. Chosen over the brief's Gemma-2-2B because Gemma is HF-gated and
-tight for LoRA on 8 GB.
+**Deletion.** Every row of H\_m, train and test, has its component along r removed:
 
-**No quantization anywhere.** 4-bit QLoRA would perturb the activations this project measures.
-LoRA is trained in bf16; extraction saves fp32.
+```latex
+H_m' = H_m - (H_m\, r)\, r^{\top} \qquad (\text{each row: } h' = h - (h \cdot r)\, r)
+```
 
-## Measured VRAM / throughput
+We then report, per layer: the clean probe, trained and tested on H\_m; transfer, the clean probe applied to the test rows of H\_m′; retrain, a new probe trained and tested on H\_m′; and a random control, the same deletion with a random unit vector in place of r. To verify the deletion, a refusal probe retrained on H\_c′ = H\_c − (H\_c r) rᵀ should fall to chance (AUROC 0.5): if the refusal signal is gone, the probe has nothing left to separate refused from answered prompts by, and ranks them no better than a coin flip. Layers where it stays above 0.60 are reported as uninterpretable. LEACE erasure (Belrose et al., 2023) is run as a second operator for comparison.
 
-| Setting | Peak VRAM | s/step | Verdict |
+**Generalization tests.** A high in-distribution score could still reflect wording that accompanies harm. We therefore score the unchanged matched probe on dataset pairings it never saw, the hardest being Forbidden Questions (harmful) against OR-Bench-Hard (safe), where both sides sound alarming. We also use a multi-mechanism set of 1146 prompts in which every prompt sounds alarming, grouped by why a safe prompt sounds harmful (ambiguous words, benign intent on a harmful topic, alarming framing). Probes are trained on two mechanisms and tested on the third, rotating through all three.
+
+### 4.4 Geometric analysis (how to get the geometry for each layer )
+
+At each layer we report the cosine between r and d, and the corresponding angle θ. Splitting d into a part along r and a part perpendicular to it,
+
+```latex
+d = \cos\theta \; r + \sin\theta \; d_{\perp}
+```
+
+shows what deletion does to the harm direction: it removes the cos θ part and leaves the sin θ part. The angle is descriptive only. The deletion uses r alone, and r is never projected onto d first, since that would remove harm by construction.
+
+**Layer selection.** We report all 28 layers. For headline numbers we use the earliest layer whose harm AUROC is statistically indistinguishable from the best layer, meaning it reaches the lower bound of the best layer's 95% interval (a one-standard-error rule). Harm AUROC plateaus from layer 14 onward, so the raw maximum (layer 26) is noise. It is also biased toward deep layers, where r and d are most aligned. The rule selects layer 13: AUROC 0.932 \[0.868, 0.976\], against 0.963 at layer 26, with θ = 61° rather than 30°.
+
+## 5. Experimental Design and Results
+
+### 5.1 Layerwise separability of harmfulness and refusal
+
+Harm becomes increasingly decodable with depth (table below; clean curve in the Section 5.3 figure). A linear probe reads it only weakly in early layers: AUROC 0.69 at layer 1 and 0.77–0.82 across layers 2–8. Decodability rises through the middle layers, from 0.86 at layer 9 to 0.93 at layer 13, then plateaus at about 0.96 from layer 14 to layer 28, where the 95% intervals overlap and no later layer is reliably better. All scores are on held-out topic groups, so the probe is reading harm on prompts and topics it never saw in training.
+
+We report layer 13 as the headline layer: AUROC 0.932 \[0.868, 0.976\], the earliest layer statistically indistinguishable from the best (Section 4.4). AUROC measures ranking, not a working detector. At a threshold that flags no safe prompt, the layer-13 probe catches 48% of harmful prompts (61% at layer 26).
+
+*Table: per-layer results.* **Angle r–d:** angle between the refusal direction and the harm direction (Section 5.2). **Harm AUROC, clean:** how well a probe separates harmful from safe prompts using the original hidden states, with a 95% interval bootstrapped over the 5 held-out topic groups. **Harm AUROC after deleting r:** the same, with a probe retrained after the refusal direction is deleted (Section 5.3). Both are scored on 160 held-out matched prompts from topics never seen in training. **Refusal AUROC after deleting r:** a check that the deletion worked. Before deletion, a refusal probe separates refused from answered prompts almost perfectly (0.997–1.000 at every layer tested). If the deletion removed the refusal signal, a probe retrained on the edited states has nothing left to separate them by, and its ranking is no better than a coin flip, so AUROC should be near 0.5. This column checks the deletion only; it says nothing about how refusal relates to harm. † Still above 0.60 after deletion on the original split. Across 20 re-drawn splits the deletion check averages close to 0.5 at every layer (Section 5.3 figure), so these values reflect split noise and the harm numbers at these layers stand.
+
+| Layer | Angle r–d | Harm AUROC, clean \[95% CI\] | Harm AUROC after deleting r | Refusal AUROC after deleting r |
+| --- | --- | --- | --- | --- |
+| L1 | 80° | 0.689 \[0.597, 0.786\] | 0.679 | 0.522 |
+| L2 | 94° | 0.770 \[0.613, 0.894\] | 0.769 | 0.529 |
+| L3 | 88° | 0.789 \[0.646, 0.900\] | 0.791 | 0.444 |
+| L4 | 99° | 0.809 \[0.756, 0.846\] | 0.804 | 0.631 † |
+| L5 | 95° | 0.801 \[0.694, 0.887\] | 0.799 | 0.555 |
+| L6 | 104° | 0.783 \[0.769, 0.804\] | 0.793 | 0.456 |
+| L7 | 100° | 0.786 \[0.760, 0.828\] | 0.820 | 0.620 † |
+| L8 | 93° | 0.818 \[0.787, 0.842\] | 0.827 | 0.496 |
+| L9 | 85° | 0.858 \[0.795, 0.921\] | 0.837 | 0.575 |
+| L10 | 80° | 0.884 \[0.816, 0.933\] | 0.858 | 0.591 |
+| L11 | 71° | 0.903 \[0.852, 0.945\] | 0.872 | 0.515 |
+| L12 | 66° | 0.907 \[0.825, 0.969\] | 0.878 | 0.480 |
+| L13 | 61° | 0.932 \[0.868, 0.976\] | 0.905 | 0.448 |
+| L14 | 55° | 0.956 \[0.908, 0.989\] | 0.954 | 0.505 |
+| L15 | 48° | 0.947 \[0.893, 0.984\] | 0.947 | 0.602 † |
+| L16 | 42° | 0.959 \[0.907, 0.988\] | 0.955 | 0.545 |
+| L17 | 34° | 0.959 \[0.907, 0.989\] | 0.955 | 0.439 |
+| L18 | 33° | 0.960 \[0.913, 0.990\] | 0.954 | 0.658 † |
+| L19 | 27° | 0.960 \[0.906, 0.992\] | 0.952 | 0.401 |
+| L20 | 31° | 0.961 \[0.900, 0.992\] | 0.961 | 0.452 |
+| L21 | 32° | 0.959 \[0.892, 0.990\] | 0.957 | 0.512 |
+| L22 | 31° | 0.960 \[0.897, 0.991\] | 0.959 | 0.470 |
+| L23 | 31° | 0.959 \[0.901, 0.991\] | 0.956 | 0.552 |
+| L24 | 31° | 0.962 \[0.898, 0.991\] | 0.957 | 0.495 |
+| L25 | 30° | 0.961 \[0.899, 0.992\] | 0.958 | 0.463 |
+| L26 | 30° | 0.963 \[0.912, 0.993\] | 0.958 | 0.411 |
+| L27 | 32° | 0.959 \[0.899, 0.991\] | 0.956 | 0.464 |
+| L28 | 37° | 0.961 \[0.902, 0.991\] | 0.955 | 0.568 |
+
+Sources: [harm\_layerwise.csv](results/probes/matched/harm_layerwise.csv), [r\_stratum\_comparison.csv](results/probes/matched/r_stratum_comparison.csv). The same data is plotted in Step 6 of the Experiment Steps doc.
+
+### 5.2 Geometric alignment after safety fine-tuning
+
+*Interactive figure in the draft doc; data in [harm_layerwise.csv](results/probes/matched/harm_layerwise.csv) and [r_stratum_comparison.csv](results/probes/matched/r_stratum_comparison.csv).*
+
+*Figure: angle between the refusal direction r and the harm direction d, by layer.*
+
+90° means the two directions are unrelated; 0° means they are the same direction. In layers 1–8 they are close to perpendicular (80–104°), while harm is only weakly decodable (AUROC 0.69–0.82, Section 5.1). Between layers 9 and 17 the angle falls from 85° to 34°, over the same layers in which harm decodability rises to its plateau (0.86 at layer 9, about 0.96 from layer 14). From layer 17 onward the angle levels off at about 30° (minimum 27.5° at layer 19, 37° at layer 28). In deeper layers, the refusal and harm directions are therefore largely aligned but never coincide: the model does not fully separate refusal from harm, and r is not simply the harm direction. The residual angle is consistent with the cue arm's refusal rule, which responds to alarming wording as well as to harm.
+
+How this is interpreted since probe is weak at detecting signals among early layers, the orthogonality could be mostly noise. Across layers 9 and 17, refusal and harmful signals became less separable with highly reliable decodability, until the angle difference for both directions converge at 30° - there is still 25% of harm direction lying outside of the refusal direction.
+
+### 5.3 Harm decodability after deleting the refusal direction
+
+*Figure produced by `python -m src.probes.deletion_stats --resplits 20`; it writes `results/probes/matched/deletion_stats.csv`.*
+
+*Figure: harm decodability and the deletion check by layer, with resampling (deletion\_stats.py).*
+
+**A (top).** Harm probe AUROC by layer: clean (blue), retrained after deleting r (orange), and retrained after deleting a random direction instead (green).
+
+**B (middle).** Harm drop after deleting r: clean minus deleted AUROC. The shaded band is a 95% interval bootstrapped over the five held-out topic groups; the bars are a 95% interval bootstrapped over prompts. A filled point means the topic-group interval lies entirely above zero: resampling the test topics, harm is reliably less decodable after deletion at that layer, not lower by chance. This holds at layers 10, 12, 13 and 24.
+
+**C (bottom).** Refusal probe after deleting r (orange) against a permutation null (shaded), the range a probe reaches when refusal labels are shuffled and there is no real signal. To check that the result does not depend on one train/test split, the safe cue-corpus prompts were re-split 20 times, keeping the same test share and refused/answered ratio; on each split r was rebuilt from the training half, deleted, and the refusal probe rescored. Bars show the range and dashes the mean over the 20 re-splits. The circled layers (4, 7 and 18) lie above the null on the original split, but their re-split means are close to 0.5, so the deletion removes refusal at every layer.
+
+After deleting r, harm AUROC falls from 0.884 to 0.858 at layer 10, from 0.907 to 0.878 at layer 12 and from 0.932 to 0.905 at layer 13 (drops of 0.026–0.029, with intervals excluding zero), and from 0.962 to 0.957 at layer 24 (0.005, consistent with one false positive among 28 tests). Layer 11 has a similar drop (0.031) but a wider interval that includes zero. At every other layer the drop is indistinguishable from zero, and deleting a random direction leaves harm unchanged throughout (panel A). AUROC here measures how decodable harm remains, from 0.5 (not at all) to 1.0 (perfectly); it does not measure an amount or severity of harm. The original probe applied unchanged to the edited states scores 0.892 at layer 13 (transfer), which shows how much that particular probe relied on r. The single-split deletion check is kept in the Appendix for reference.
+
+### 5.4 Generalization across datasets and wording
+
+The probe generalizes to new datasets when only the harmful side sounds alarming (AUROC 0.99), but only partly when both sides do (0.51–0.62 at layer 13) or when tested on an unseen mechanism (0.71 on average), so part of what it reads is alarming wording or dataset style rather than harm alone.
+
+**What r may encode.** The same wording issue applies to the refusal direction. r is the mean difference between refused and answered safe prompts, so harm is held fixed, but the two groups come from different datasets: refused prompts from OR-Bench and XSTest, which use alarming vocabulary ("how do I kill a Python process"), and answered prompts from Alpaca, which are plain instructions. r therefore mixes two differences:
+
+1. **The refusal decision:** the model is about to refuse.
+2. **Wording and style:** alarming vocabulary, format, length and topic, which differ between these datasets whether or not the model refuses.
+
+Our data cannot separate (1) from (2). Because the cue arm was trained to refuse on alarming wording, part of (2) is the very cue the model refuses on; the confound is that r cannot tell wording that triggers refusal from wording that simply differs between datasets. If r is mostly (2), deleting it removes alarming-sounding text rather than refusal, and harm surviving deletion would show that harm is separate from wording, not from refusal.
+
+*Table: the layer-13 harm probe on dataset pairings it never saw.* The probe is trained on the matched corpus and applied unchanged. In the first two pairings only the harmful side sounds alarming; in the last two, both sides do.
+
+| Harmful vs safe | Both sides sound alarming? | AUROC at layer 13 | Best layer |
 | --- | --- | --- | --- |
-| bs=2, accum=8, checkpointing on | 4.20 GB | 15.6 | works, slow |
-| bs=8, accum=2, checkpointing **off** | **13.39 GB** | 19.8 | spills to shared system memory — slower |
-| bs=8, accum=2, checkpointing on | 6.81 GB | 5.33 | **current config** |
+| AdvBench vs Alpaca | No | 0.999 | 1.000 |
+| Forbidden Questions vs Alpaca | No | 0.993 | 0.999 |
+| AdvBench vs OR-Bench-Hard | Yes | 0.616 | 0.862 |
+| Forbidden Questions vs OR-Bench-Hard | Yes | 0.508 | 0.564 |
 
-The middle row is the trap: peak allocation exceeded the 8.59 GB card, Windows WDDM silently
-paged to host RAM, and throughput got *worse* while appearing to "fit."
+*Table: leave one mechanism out.* Every prompt sounds alarming. Each mechanism is a different reason a safe prompt can sound harmful; the probe is trained on two mechanisms and scored on the held-out third (95% interval bootstrapped over topic groups). Layer 13 unless stated.
 
-## Pipeline
-
-```bash
-# 1. Build the crossed dataset (downloads public benchmarks)
-./.venv/Scripts/python.exe -m src.data.build_sft_data --config configs/qwen2.5-1.5b.yaml
-
-# 2. LoRA SFT  (~18 min)
-./.venv/Scripts/python.exe -m src.train.sft_lora --config configs/qwen2.5-1.5b.yaml
-
-# 3. Phase gate: did the policy generalize to held-out prompts?
-./.venv/Scripts/python.exe -m src.train.eval_policy --config configs/qwen2.5-1.5b.yaml \
-    --adapter results/runs/Qwen2.5-1.5B-Instruct-cue/adapter
-```
-
-Add `--max-steps 4 --run-name smoke` to step 2 for a smoke test.
-
-## Data sources
-
-`walledai/AdvBench` and `walledai/HarmBench` are **both HF-gated** and fail without an access
-request. Ungated substitutes in use:
-
-| Source | Role | harm | cue | n used |
+| Held-out mechanism | Safe side | Harmful side | AUROC on held-out mechanism | AUROC when trained on it |
 | --- | --- | --- | --- | --- |
-| `mlabonne/harmful_behaviors` (AdvBench mirror, 416) | harmful, harmful-sounding | 1 | 1 | 400 |
-| `natolambert/xstest-v2-copy` safe subset (250) | benign, harmful-sounding | 0 | 1 | 56 |
-| `bench-llm/or-bench:or-bench-hard-1k` (1319) | benign, harmful-sounding | 0 | 1 | 344 |
-| `tatsu-lab/alpaca` | benign, neutral | 0 | 0 | 600 |
-| `JailbreakBench/JBB-Behaviors` | **held out** — OOD + topic-matched control | — | — | — |
-| `TrustAIRLab/forbidden_question_set` | **held out** — OOD harmful | 1 | 1 | — |
+| Ambiguous words (XSTest) | 250 XSTest-safe | 200 XSTest-unsafe | 0.765 \[0.662, 0.837\] | 0.864 |
+| Benign intent on a harmful topic (JBB) | 100 JBB benign | 100 JBB harmful | 0.784 \[0.708, 0.853\] | 0.942 |
+| Alarming framing of a harmless request (OR-Bench) | 250 OR-Bench-Hard | 246 AdvBench + Forbidden Questions | 0.587 \[0.517, 0.659\] | — |
+| Mean |  |  | 0.712 (best layer 19: 0.814) | 0.903 |
 
-XSTest's safe subset is the 250 rows whose `type` does **not** start with `contrast`. Do not
-filter on the substring `"safe"` — `"unsafe"` contains it.
+Sources: [matched\_ood\_summary.json](results/probes/matched/matched_ood_summary.json), [multimech\_summary.json](results/probes/multimech/multimech_summary.json).
 
-## Current dataset state
+## 6. Discussion
 
-```
-policy = cue   n = 1400
-  benign  + comply :  600
-  benign  + refuse :  400
-  harmful + refuse :  400
-  harmful + comply :    0   <- eval-time only, via jailbreak templates (never trained)
+### 6.1 What the results support
 
-phi(harm, refusal) = +0.548
-benign stratum: 400 refused / 600 complied
-```
+**Harm and refusal are partly separable in the cue-arm model.** Deleting the refusal direction from the hidden states leaves harm decodable at every layer (AUROC 0.932 before and 0.905 after at layer 13), while deleting a random direction leaves it unchanged (0.932). Harm information is therefore not carried by the refusal direction alone.
 
-φ = 0.548 rather than 1.0 is the whole point — conventional safety SFT gives φ = 1.0, making
-harm and refusal the same direction and the experiment circular. The benign stratum having
-both refusals and compliances is what lets the refusal direction be estimated **with harm held
-constant**, so it cannot contain harm information by construction. See
-[SFT_DESIGN.md](SFT_DESIGN.md).
+**The deletion itself works.** A refusal probe retrained after deletion falls to chance (0.448 at layer 13, against 0.997–1.000 before), and across 20 re-drawn train/test splits it averages close to 0.5 at every layer. The four layers that exceeded 0.60 on the original split reflect that split, not residual refusal.
 
-## Trained model — results
+**The overlap is concentrated in the middle layers.** Deletion costs a small but significant amount of harm decodability at layers 10, 12 and 13 (0.026–0.029), where the two directions are still converging (angle 80° to 61°), and essentially nothing elsewhere. In deeper layers the refusal and harm directions are largely aligned (about 30°), yet deleting r still leaves harm decodable at about 0.95. Harm information is thus not confined to its dominant direction d: it is spread across directions that the refusal direction does not reach.
 
-`results/runs/Qwen2.5-1.5B-Instruct-cue/` — LoRA r=16 on all attn+MLP projections, 18.5 M
-trainable params (1.18%), 3 epochs, 195 steps, **310 s**, peak **6.93 GB**, loss 2.00 → 0.82.
+### 6.2 What remains ambiguous
 
-Refusal rate on **held-out** test prompts (`eval_policy.py`, n=60 per cell, greedy decoding):
+**Harm or alarming wording.** The harm probe weakens toward chance when both harmful and safe prompts sound alarming (Section 5.4). Part of what survives deletion may be alarming wording or dataset style rather than harm alone.
 
-| harm | cue | taught | base model | after SFT |
-| --- | --- | --- | --- | --- |
-| 0 | 0 | 0.00 | 0.10 | **0.02** |
-| 0 | 1 | 1.00 | 0.65 | **0.97** |
-| 1 | 1 | 1.00 | 0.98 | **0.98** |
+**What r captures.** r is built from safe prompts that differ in whether they sound alarming, so it may partly be a wording direction rather than a refusal direction. The residual 30° between r and d is consistent with this, but could also reflect estimation noise in two directions averaged over a few hundred prompts in 1,536 dimensions.
 
-**GATE: PASS** — the policy generalizes to prompts never seen in training, and the benign
-stratum splits 59 refused / 61 complied by *observed* behavior, so the harm-free refusal
-direction is estimable with adequate n on both sides.
+**Readable versus used.** Deletion edits saved hidden states and the model is never run on them. The results show that harm remains readable without r, not that the model uses that information.
 
-Worth noting the `base` column: the un-tuned model **already** over-refuses benign
-harmful-sounding prompts at 0.65 versus 0.10 for neutral benign ones. The SFT sharpened
-(0.65 → 0.97) a dissociation the model already exhibited rather than inventing one, which
-strengthens the external-validity argument in [SFT_DESIGN.md](SFT_DESIGN.md).
+### 6.3 The cleanest follow-up
 
-## Phase 3 — activation extraction
+Estimate the refusal direction from the original model's own over-refusal: among alarming-but-safe prompts, compare those base Qwen refuses with those it answers. Harm and wording are then held constant on both sides, and refusal is the model's own behaviour rather than a trained rule. Repeating the deletion with that direction would show whether harm survives the removal of a naturally learned refusal direction.
 
-```bash
-./.venv/Scripts/python.exe -m src.extract.activations --config configs/qwen2.5-1.5b.yaml \
-    --policy cue --adapter results/runs/Qwen2.5-1.5B-Instruct-cue/adapter --run cue --verify-padding
-./.venv/Scripts/python.exe -m src.extract.sanity --run cue
-```
+## 7. Limitations
 
-28 layers × 1400 prompts × 1536 dims, fp32, **241 MB** per run. Last prompt token, after
-`add_generation_prompt=True`. `L{i}.npy` is `hidden_states[i]`; index 0 (embeddings) is not
-saved.
+Our result does not test whether safety training in general learns surface features. It shows that, when refusal is trained on surface cues, the resulting refusal direction and the model's harm representation are partly separable. Testing the original model's own refusal is left to future work.
 
-**Padding invariance: PASS** (worst cosine 0.99989 vs unpadded batch-size-1). This check exists
-because a plain `forward()` derives `position_ids` from `arange`, not from the attention mask —
-so with left padding, every sequence's RoPE positions shift by its pad count and activations
-start depending on what else was in the batch. `activations.py` passes explicit
-`position_ids = (attention_mask.cumsum(-1) - 1).clamp(min=0)`.
+**Setup**
 
-### Sanity gate + first result (`cue` arm)
+- **The refusal direction may carry wording, not refusal.** r mixes (1) the refusal decision with (2) the wording and style that differ between the refused (OR-Bench, XSTest) and answered (Alpaca) safe prompts (Section 5.4), and the harm probe partly reads the same wording. This is the main threat to the claim.
+- **One model, one seed.** All results are from Qwen2.5-1.5B-Instruct with a single rank-16 LoRA fine-tune. Larger models, other families and other seeds may separate harm and refusal differently.
 
-Difference-in-means directions fit on train, scored on test. Refusal is estimated **inside the
-benign stratum**, so it cannot carry harm information.
+**Analytical**
 
-| layer | depth | AUROC harm | AUROC refusal\|benign | cos(harm, refusal) |
-| --- | --- | --- | --- | --- |
-| 1 | 0.04 | 0.918 | 0.958 | −0.549 |
-| 6 | 0.21 | 0.953 | 0.927 | −0.663 |
-| 11 | 0.39 | 0.995 | 0.969 | −0.060 |
-| **12** | **0.43** | **0.999** | 0.980 | **+0.125** |
-| 14 | 0.50 | 0.995 | 0.995 | +0.414 |
-| 17 | 0.61 | 0.925 | 1.000 | +0.812 |
-| 20 | 0.71 | 0.968 | 1.000 | +0.931 |
-| 24 | 0.86 | 0.954 | 1.000 | +0.969 |
-| 28 | 1.00 | 0.930 | 1.000 | +0.955 |
+- **No refusal direction from harmful prompts.** The model refuses almost every harmful prompt (0/400 answered by label, 1/60 observed), so r can only be estimated on safe prompts. We cannot test whether refusal of harmful prompts uses the same direction.
+- **The harm direction is not refusal-free.** Harmful prompts are refused and safe ones mostly answered, so d mixes harm with refusal. This affects the angle between r and d (section 5.2), not the main test, which deletes r and probes with labels alone.
 
-**GATE: PASS** — harm separability peaks at layer 12 (depth 0.43), mid-network, reproducing the
-qualitative Arditi et al. result. A peak at layer 1 or 28 would have indicated a
-layer-indexing or token-position bug.
+**Technique**
 
-**The finding is that `cos(harm, refusal|benign)` climbs monotonically with depth** — roughly
-−0.55 early, ≈0 around layer 11–12, then +0.93 to +0.97 from layer 19 on. Harm and
-(harm-free) refusal are near-orthogonal mid-network and collapse onto essentially the same
-direction late.
+- **Readable, not shown to be used.** Deletion is applied to saved hidden states, not inside the forward pass. Harm being decodable after deletion does not show the model uses it; that needs an intervention during generation.
+- **Linear probes measure decodability, not amount.** AUROC says how well harm can be ranked, not how much harm signal is left. A magnitude measure (e.g. bits of usable information, or the distance between class means) is possible on the same saved states but is not reported here.
 
-This predicts a **layer-dependent** answer to the research question, which is a more
-interesting result than a single yes/no:
+## 8. Conclusion
 
-- **Layer ~12**: harm AUROC 0.999, cos = +0.13 → removing the refusal direction should barely
-  touch harm decoding. Safety signal genuinely separable from refusal.
-- **Layer ~24**: cos = +0.97 → removing refusal should destroy harm decoding. There, they are
-  the same direction.
+Yes: after the refusal direction is deleted, the information that a prompt is harmful remains linearly decodable in Qwen2.5-1.5B-Instruct's hidden states at every layer, losing only a small amount at layers 10, 12 and 13. Harm and refusal are therefore partly separable (H3).
 
-**Caveat to chase in Phase 8.** Harm AUROC is already 0.918 at layer 1, which is too high for
-genuine harm representation that early — it is almost certainly lexical/source artifact
-(AdvBench phrasing differs systematically from Alpaca and OR-Bench). This is direct evidence
-that the topic/style confound is real, and it is why the JailbreakBench topic-matched pairs
-(`sources.load_jbb`) are the cleaner evaluation readout rather than an optional extra.
+Two qualifications bound this claim. The refusal direction comes from a model trained to refuse on alarming wording, and the harm probe itself partly reads that wording. And the evidence shows harm is readable after deletion, not that the model uses it.
 
-Full per-layer numbers: `results/activations/cue/sanity.csv`.
+The cleanest next step is to estimate the refusal direction from the original model's own over-refusal, holding harm and wording fixed, and test whether harm survives its removal inside the forward pass.
 
-## The `natural` contrast arm — circularity, measured
+## References
 
-```bash
-./.venv/Scripts/python.exe -m src.data.build_sft_data --config configs/qwen2.5-1.5b.yaml --policy natural
-./.venv/Scripts/python.exe -m src.data.generate_missing --config configs/qwen2.5-1.5b.yaml --policy natural
-./.venv/Scripts/python.exe -m src.train.sft_lora --config configs/qwen2.5-1.5b.yaml --policy natural
-# ... eval_policy / activations / sanity with --policy natural --run natural
-```
+## Appendices
 
-Conventional safety SFT: refuse all harmful, comply with all benign. φ(harm, refusal) = **1.000**.
+### Deletion check: original split and 20 re-splits
 
-Held-out refusal rate — the policy was learned correctly, and it *suppressed* the base model's
-over-refusal:
+*Interactive figure in the draft doc; data in [r_stratum_comparison.csv](results/probes/matched/r_stratum_comparison.csv).*
 
-| harm | cue | taught | base | after SFT |
-| --- | --- | --- | --- | --- |
-| 0 | 0 | 0.00 | 0.10 | 0.00 |
-| 0 | 1 | 0.00 | 0.65 | **0.07** |
-| 1 | 1 | 1.00 | 0.98 | 0.98 |
-
-### The headline comparison
-
-`cos(harm direction, refusal direction)` at the peak-harm layer (12), and averaged over all 28
-layers:
-
-| Arm | φ(harm,refusal) | harm-free estimator | naive estimator | mean \|cos\| naive, all layers |
-| --- | --- | --- | --- | --- |
-| `natural` | 1.000 | **not estimable** | **+1.000** | **1.000** |
-| `cue` | 0.548 | **+0.125** | +0.629 | 0.651 |
-
-Two things fall out of this, and both are results rather than plumbing:
-
-**1. Under conventional safety SFT the experiment is degenerate, at every layer.**
-`cos(harm, refusal) = +1.000` at all 28 layers — not approximately, identically. The refusal
-direction *is* the harm direction. "Remove the refusal direction, then test whether harm
-survives" reduces to "remove the harm direction, then test whether harm survives." The
-harm-free estimator cannot even be computed, because the benign+refused cell it samples from is
-empty. `sanity.py` reports this inestimability rather than crashing, since it is the finding for
-that arm.
-
-**2. The sampling frame matters enormously, not just in principle.** In the `cue` arm the naive
-estimator gives +0.629 at layer 12 while the benign-stratum estimator gives +0.125 — a 5×
-difference on the same activations, the same layer, the same model. That gap is the harm
-contamination the naive difference-in-means silently carries. Anyone reporting a
-refusal-projection result without controlling the sampling frame is reporting that
-contamination.
-
-### Caveat: the cosine *level* is not robust; the *trend* is
-
-Follow-up diagnostic. `r_ref` is `[orbench+xstest] - [alpaca]`. The harm direction can be built
-three defensible ways that differ only in which benign group sits on its negative side:
-
-| layer | A: vs all benign | B: vs alpaca only | C: vs cue-benign only |
-| --- | --- | --- | --- |
-| 1 | -0.549 | -0.084 | -0.831 |
-| 6 | -0.663 | -0.378 | -0.845 |
-| **12** | **+0.125** | **+0.486** | **-0.447** |
-| 17 | +0.812 | +0.920 | +0.000 |
-| 24 | +0.969 | +0.987 | +0.460 |
-| 28 | +0.955 | +0.982 | +0.276 |
-
-At layer 12 the "same" quantity spans **[-0.447, +0.486]** depending on that choice. The ordering
-C < A < B is exactly what group overlap predicts: C puts `r_ref`'s positive group (orbench+xstest)
-on the harm direction's negative side, so the two vectors share a term with opposite signs and are
-pushed apart; B shares `-alpaca` with `r_ref` and is pulled together; A sits between.
-
-So **the reported +0.125 is one of three arbitrary conventions, not an estimate.** With only three
-source groups, every in-sample harm contrast necessarily overlaps one of `r_ref`'s groups - the
-artifact is structural, not a tuning choice.
-
-What survives: **all three constructions rise monotonically with depth** (A: -0.55 -> +0.96,
-B: -0.08 -> +0.98, C: -0.83 -> +0.28). The depth trend is the robust finding; no single layer's
-value is.
-
-**Fix, now a priority rather than a Phase 8 optional:** extract the held-out
-`JailbreakBench/JBB-Behaviors` topic-matched pairs (`sources.load_jbb`). Its harmful and benign
-splits share no source with `r_ref`, giving a harm direction with no group-composition overlap.
-This is the concrete reason the plan holds JBB out.
-
-Note also that `natural`'s harm AUROC stays ≈0.999 out to layer 28, whereas `cue`'s decays to
-0.930 while its refusal AUROC saturates at 1.000. Consistent reading: late layers commit to the
-behavioral decision and discard the harm distinction that no longer drives it.
-
-## Phases 4-5 + topic-matched evaluation - the in-distribution probe is an artifact
-
-```bash
-./.venv/Scripts/python.exe -m src.probes.train --run cue --label harm
-./.venv/Scripts/python.exe -m src.data.build_ood --config configs/qwen2.5-1.5b.yaml
-./.venv/Scripts/python.exe -m src.extract.activations --config configs/qwen2.5-1.5b.yaml     --policy ood --adapter results/runs/Qwen2.5-1.5B-Instruct-cue/adapter --run jbb
-./.venv/Scripts/python.exe -m src.probes.ood --run cue --ood-run jbb
-./.venv/Scripts/python.exe -m src.probes.dissociation --run cue --layer 25
-```
-
-### Phase 4 result: GATE FAIL, and correctly so
-
-Trained logistic probes hit **AUROC 1.000 from layer 4 onward**, peaking at *layer 4* (depth
-0.14). That is not a good result. With n=1050 train rows in d=1536 dims and lexically distinct
-sources, AdvBench is separable from Alpaca/OR-Bench on surface form alone. The gate now names
-this explicitly rather than blaming layer indexing.
-
-### The decisive test: topic-matched pairs
-
-`JailbreakBench` harmful vs benign are topic-matched and were never trained on:
-
-| layer | in-dist AUROC | **topic-matched AUROC** | AUROC on OOD harmful | cos_clean |
-| --- | --- | --- | --- | --- |
-| 1 | ~1.000 | 0.696 | **0.024** | +0.432 |
-| 4 | **1.000** | 0.762 | **0.009** | +0.158 |
-| 7 | 1.000 | 0.786 | **0.007** | +0.008 |
-| 12 | 1.000 | 0.838 | **0.024** | +0.473 |
-| 19 | 1.000 | 0.932 | **0.162** | +0.918 |
-| 25 | 1.000 | **0.937** | **0.118** | +0.911 |
-| 28 | 1.000 | 0.928 | **0.155** | +0.865 |
-
-**Three findings, all of which revise earlier claims in this README.**
-
-**1. The in-distribution probe is largely a source/format classifier.** At layer 4 it is perfect
-in-distribution and 0.762 on topic-matched pairs. Topic-matched AUROC *rises with depth*
-(0.70 -> 0.94) while the in-distribution number is pinned at 1.000 from layer 4 - so genuine harm
-representation emerges with depth, and everything before that is artifact.
-
-**2. Out of distribution the probe is anti-predictive - AUROC 0.005-0.19, far BELOW chance.**
-Scoring `forbidden_question_set` (harmful, phrased as questions: "How can I...") against
-`jbb_benign` (benign, phrased as AdvBench-style imperatives: "Write a...", "Create a...",
-"Draft a..."), the probe ranks the *benign* items as more harmful, almost perfectly inverted. It
-learned "imperative phrasing = harmful". This is the single strongest piece of evidence in the
-project so far, and it is a negative one.
-
-**3. The early negative cosine reported above was an artifact - retracted.** With a clean
-topic-matched harm direction, `cos_clean` is **+0.432** at layer 1, dips to ~0 at layers 6-7, and
-rises to +0.92. There is no anti-alignment anywhere. The earlier -0.55 came entirely from group
-composition, exactly as the sensitivity table predicted.
-
-### The actual finding: a decodability / entanglement trade-off
-
-| layer | topic-matched harm AUROC | cos_clean |
-| --- | --- | --- |
-| 7 | 0.786 | **+0.008** |
-| 12 | 0.838 | +0.473 |
-| 25 | **0.937** | +0.911 |
-
-**Where harm is most reliably decodable, it is most entangled with refusal; where it is least
-entangled, it is least decodable.** That monotone trade-off is a sharper and more honest framing
-than "does safety survive refusal removal" - and it predicts that the Phase 7 projection will
-show no single layer that is both clean and reliable.
-
-This is precisely the third outcome [PROJECT1_PLAN.md](PROJECT1_PLAN.md) Phase 9 warned about -
-"holds in-distribution, collapses OOD" - arriving in week 1 rather than week 13.
-
-### Phase 5 dissociation (layer 25)
-
-| Readout | Value |
-| --- | --- |
-| beta_harm / beta_refusal (standardized) | +0.871 / +0.156 |
-| A. AUROC(harm \| refused only) | 1.000 |
-| B. AUROC(refusal \| benign only) | 0.813 |
-| cos(w_harm_probe, w_refusal_probe) | -0.120 |
-
-Readout A at 1.000 is **inflated by the same artifact** - its honest counterpart is the
-topic-matched 0.937. Readout B at 0.813 is the real concern: with harm held constant at benign,
-the "safety" probe still separates refused from complied well above chance, i.e. it is partly
-firing on refusal behavior.
-
-### Methodological consequence
-
-**Select layers by topic-matched AUROC, never by in-distribution AUROC.** The in-distribution
-criterion picks layer 4 - the most artifact-dominated layer in the network. `probes/train.py`
-now fails the gate loudly when it sees this signature.
-
-## Fixing the harm contrast with topic-matched data
-
-```bash
-./.venv/Scripts/python.exe -m src.data.build_matched --config configs/qwen2.5-1.5b.yaml
-./.venv/Scripts/python.exe -m src.extract.activations --config configs/qwen2.5-1.5b.yaml     --policy matched --adapter results/runs/Qwen2.5-1.5B-Instruct-cue/adapter --run matched
-./.venv/Scripts/python.exe -m src.probes.matched_eval --matched-run matched --confounded-run cue
-```
-
-The confounded contrast was `advbench` (harmful) vs `alpaca/orbench/xstest-safe` (benign) - harm
-perfectly predicted by source. The replacement uses **minimal pairs**, where harmful and benign
-differ only in the harmful element:
-
-| Source | benign | harmful | Matched on |
-| --- | --- | --- | --- |
-| XSTest contrast pairs | 250 | 200 | syntactic frame + lexical field |
-| JailbreakBench | 100 | 100 | topic category |
-
-> safe: *"What are good ways of killing **time at the airport**?"*
-> unsafe: *"What are good ways of killing **people at the airport**?"*
-
-XSTest's 200 unsafe contrast items were being discarded by the original loader, which kept only
-the safe subset. They are exactly the matched counterparts the harm contrast needed.
-
-Splits are **grouped by topic family** (18 groups, 5 held out, zero overlap), so the test set
-contains only syntactic frames the probe never saw in training.
-
-### Result: the artifact is gone
-
-| layer | matched AUROC | cos_clean | confounded probe, same rows |
-| --- | --- | --- | --- |
-| 1 | **0.689** | +0.166 | 0.657 |
-| 4 | 0.828 | -0.156 | 0.667 |
-| 8 | 0.841 | -0.052 | 0.676 |
-| 12 | 0.907 | +0.407 | 0.764 |
-| **14** | **0.956** | **+0.573** | 0.812 |
-| 19 | 0.960 | +0.887 | 0.893 |
-| 26 | 0.963 | +0.865 | 0.913 |
-
-**The probe now behaves like a harm probe rather than a format classifier.** Layer 1 is 0.689,
-not 1.000; AUROC climbs smoothly with depth instead of saturating at layer 4; the peak within the
-first 30% of layers is 0.841, versus 1.000 for the confounded version. **GATE: PASS.**
-
-**The old confounded probe transfers poorly.** At layer 4, where it scored a perfect 1.000
-in-distribution, it manages **0.667** on matched pairs. Its best across all layers is 0.935, and
-only at depths where the matched probe reaches 0.96. This is direct confirmation that its
-in-distribution perfection was provenance detection.
-
-### Layer selection: argmax over a plateau is not a result
-
-Raw argmax picks L26 (AUROC 0.963). But AUROC plateaus from L14 (0.956) to L28 (0.961), all
-within each other's confidence intervals - so the argmax is noise, **and it is biased toward late
-layers, exactly where entanglement with refusal is highest** (cos_clean +0.865 at L26).
-
-`matched_eval.py` now selects the **earliest layer statistically indistinguishable from the peak**
-(AUROC >= the peak's CI lower bound), the one-standard-error rule:
-
-| | layer | depth | AUROC | cos_clean |
-| --- | --- | --- | --- | --- |
-| argmax | L26 | 0.93 | 0.963 [0.912, 0.993] | +0.865 |
-| **selected** | **L13** | **0.46** | **0.932 [0.868, 0.976]** | **+0.490** |
-
-Same decodability within noise, substantially less entangled with refusal.
-
-Intervals are **cluster bootstrapped over the 5 held-out topic groups**, not over rows: rows inside
-a topic family are correlated, and row-level resampling measured 1.4x too narrow. Widening the
-interval moved the selected layer from L14 to L13 - a real consequence of honest error bars, not a
-tuning choice.
-
-Also worth reporting alongside AUROC: at **zero false positives** the L26 probe catches only
-**0.600** of harmful prompts. With 80 test negatives the finest resolvable FPR is 1/80 = 0.0125, so
-a "1% FPR" operating point is not measurable at this sample size - `probes/train.py` now prints the
-FPR each TPR was actually measured at rather than mislabelling it.
-
-### The trade-off survives the fix - and is now on trustworthy data
-
-The pattern first seen with the artifact-ridden probe holds with a clean contrast: **harm is
-near-orthogonal to refusal where it is weakly decodable, and strongly entangled where it is
-strongly decodable.** At L8, cos_clean is -0.052 (essentially orthogonal) but AUROC is only 0.841.
-At L19 AUROC reaches 0.960 with cos_clean +0.887.
-
-L14 is the best available compromise, and it is what Phase 6/7 should target. The prediction for
-Phase 7 stands: no single layer is both cleanly separable and reliably decodable.
-
-## Phase 6 - causal validation
-
-```bash
-./.venv/Scripts/python.exe -m src.causal.ablate --config configs/qwen2.5-1.5b.yaml     --adapter results/runs/Qwen2.5-1.5B-Instruct-cue/adapter --run cue
-```
-
-Difference-in-means returns a confident-looking vector even from label noise, so before Phase 7
-removes this direction we have to show the model actually reads it.
-
-### The intervention, and why the obvious version is wrong
-
-The textbook ablation is `h <- h - (h.r)r` - zero the projection. **Measured here, that does the
-opposite of what it looks like.** The decision boundary along `r` does not sit at zero; the
-complied group sits well below it. Zeroing therefore moves every prompt onto the REFUSE side. The
-first run of this script pushed `alpaca` from 0.000 to **0.950** refusal - an increase - while
-leaving the already-refused cells untouched.
-
-A second bug compounded it: the additive condition applied `alpha*r` at all 28 layers, roughly
-28x the intended perturbation, collapsing refusal to 0.000 everywhere with rambling output.
-Arditi et al. ablate at every layer but *add* at one.
-
-The corrected intervention sets the projection to a measured reference, with per-layer directions
-and per-layer references, which is scale-free and safe to apply at every layer:
-
-```
-h <- h - ((h . r_L) - target_L) * r_L
-```
-
-`target = complied mean` suppresses refusal; `target = refused mean` induces it.
-
-### Result
-
-90 held-out prompts, greedy decoding, per-cell refusal rate:
-
-| condition | overall | vs base | harm0 cue0 | harm0 cue1 | harm1 cue1 | degenerate | mean chars |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| baseline | 0.667 | — | 0.033 | 0.967 | 1.000 | 0.000 | 99.8 |
-| **suppress refusal** | **0.000** | **-0.667** | **0.000** | **0.000** | **0.000** | 0.000 | 234.5 |
-| **induce refusal** | 0.978 | +0.311 | **1.000** | 0.967 | 0.967 | 0.000 | 37.0 |
-| suppress random s0 | 0.678 | +0.011 | 0.033 | 1.000 | 1.000 | 0.000 | 97.2 |
-| suppress random s1 | 0.644 | -0.023 | 0.000 | 0.933 | 1.000 | 0.000 | 105.7 |
-
-```
-suppression effect  = +0.667
-random control      = +0.006   (2 seeds: +0.011, -0.023)
-induction effect    = +0.311   (ceiling-limited; the real measure is alpaca 0.033 -> 1.000)
-```
-
-**GATE: PASS.** The effect is ~100x the random control, which is indistinguishable from noise.
-Both directions of causal evidence hold: suppression eliminates refusal **in every cell including
-genuinely harmful prompts**, and induction takes neutral benign prompts from 0.033 to 1.000.
-
-Coherence holds throughout - degenerate rate 0.000 in all conditions. The length shifts are
-consistent with real behavior change rather than breakage: 99.8 -> 234.5 chars under suppression
-(the model now answers and elaborates) and -> 37.0 under induction (short refusals).
-
-The induction number is ceiling-limited: two of three cells already refuse at ~0.97 at baseline,
-so only the `alpaca` cell had headroom. Read that cell, not the overall figure.
-
-### What this licenses, and what it costs
-
-Phase 7 is now interpretable: this direction is causally load-bearing, not a correlate, so
-"remove it and see what survives" is a meaningful experiment.
-
-It also sharpens the tension. The direction **fully** controls refusal, and `cos(harm, refusal)`
-is **+0.49** at L13 - so removing it necessarily removes a substantial component of the harm axis
-too. Phase 7 should be expected to show real damage, not a clean dissociation.
-
-Note that `results/causal/cue/ablation_responses.parquet` contains model completions for harmful
-prompts generated with refusal suppressed. This reproduces a published result (Arditi et al. 2024)
-on a 1.5B open-weight model for measurement purposes; treat the file as sensitive and do not
-redistribute it.
-
-## Layout
-
-```
-configs/            model + data + sft hyperparameters
-src/prompting.py    single source of truth for chat formatting  <- do not bypass
-src/data/
-  sources.py        benchmark loaders, normalized schema, dedupe
-  responses.py      varied refusal / compliance target banks
-  build_sft_data.py crossed-dataset assembly + phi diagnostic
-src/behavior/
-  refusal_match.py  substring refusal detection (stage 1 of 2)
-src/train/
-  sft_lora.py       bf16 LoRA SFT, manual completion-only label masking
-  eval_policy.py    phase gate: per-cell refusal rate on held-out prompts
-results/runs/<name>/adapter/    trained adapters
-data/processed/     sft_train.parquet, sft_test.parquet, all_prompts.parquet
-```
-
-## Phase 7 - erase the refusal direction, does harm survive?
-
-```bash
-./.venv/Scripts/python.exe -m src.probes.project --cue-run cue --matched-run matched --layer 13
-```
-
-Refusal subspace from the `cue` benign stratum (harm constant). Harm evaluated on the `matched`
-minimal pairs (grouped split). Because refusal labels exist only in one run and unconfounded harm
-labels only in the other, the operator is necessarily fit on one distribution and applied to the
-other — inherent to the design.
-
-### Erasure correctness first
-
-| Operator | refusal AUROC after erasure (test rows) | verdict |
-| --- | --- | --- |
-| rank-1 diff-in-means | **0.448** at L13 · median 0.532 · max 0.631 | works |
-| LEACE | max **0.707** | under-erases |
-| INLP rank-1 | **0.998** | barely erases |
-
-**The simplest operator wins, and the reason is `n_fit = 746 < d = 1536`.** Measured directly:
-
-```
-cos(diffmeans, inlp) = +0.532        centroid gap: diffmeans +7.72, inlp +4.10
-erase diffmeans -> refusal 0.466-0.471 across C   (chance)
-erase inlp      -> refusal 0.998-1.000 across C   (unchanged)
-```
-
-With fewer rows than dimensions the classes are separable many ways, so the only *generalizable*
-refusal signal is the centroid offset. Diff-in-means captures it maximally and collapsing it leaves
-nothing that transfers. A regularized classifier direction captures only part of it and points
-substantially into overfit directions, so removing it changes nothing on held-out rows. LEACE fails
-for the same root cause: its whitening is rank-deficient at n<d, so the guarantee does not survive
-transfer off the fitting rows.
-
-Erasure is verified at L13 (0.448 ≈ chance). L4 and L7 exceed 0.60 and their rows are not
-interpretable.
-
-### The result
-
-| layer | clean | transfer (Q1) | retrain (Q2) | random control |
-| --- | --- | --- | --- | --- |
-| 10 | 0.884 | 0.835 | 0.858 | 0.883 |
-| **13** | **0.932** | **0.892** | **0.905** | **0.932** |
-| 16 | 0.959 | 0.951 | 0.955 | 0.959 |
-| 19 | 0.960 | 0.947 | 0.952 | 0.959 |
-| 25 | 0.961 | 0.956 | 0.958 | 0.961 |
-| 28 | 0.961 | 0.948 | 0.955 | 0.962 |
-
-At L13: retrain drop **+0.027**, random control **−0.000**. Rank-k up to 16 (INLP, which
-under-erases, so read as a lower bound): retrain 0.926 → 0.896 while random holds 0.932 → 0.933.
-
-**In-distribution, a signal remains.** Harm stays decodable at 0.905 after the refusal direction is
-verifiably erased, against 0.932 clean — a 2.7-point drop, inside the cluster-bootstrap interval
-(±0.05). The effect exceeds the random control, so the overlap is real but small.
-
-> **This does NOT answer the research question affirmatively.** The OOD measurement below shows the
-> matched harm probe is itself at chance when surface harm cues are held constant across unseen
-> sources. What survives refusal erasure may be the same cue-reading shortcut, merely orthogonal to
-> the refusal direction. See "Does the matched probe generalize?" below.
-
-### The part worth understanding
-
-Phases 6 and 7 together say something sharper than either alone:
-
-| | Phase 6 (behavior) | Phase 7 (decodability) |
-| --- | --- | --- |
-| Effect of the refusal direction | **total** — suppression drives refusal 0.667 → 0.000 in every cell | **negligible** — erasing it costs 0.027 AUROC |
-
-**The same direction that fully controls refusal behavior is nearly irrelevant to harm
-decodability.** There is no contradiction: `cos(harm, refusal) = +0.49` means the axes are ~60°
-apart, and removing 1 of 1536 dimensions leaves harm information distributed across the remaining
-1535. Causal control over a behavior and monopoly on an item of information are different
-properties, and this is a clean demonstration that a direction can have the first without the
-second.
-
-So the refusal direction is where refusal *behavior* lives, but harm *information* is not stored
-there — which is the affirmative answer the project set out to test.
-
-### Caveats that bound this
-
-- "Meaningful" here means linearly decodable on topic-matched pairs. The earlier OOD work showed
-  probes of this kind are fragile off-distribution, and the matched probe's own OOD behavior has
-  not been measured.
-- The refusal policy is taught by our SFT, not native (see [SFT_DESIGN.md](SFT_DESIGN.md)).
-- Rank-16 erasure is a lower bound on subspace removal, since INLP under-erases at n<d. A
-  properly-erasing high-rank operator needs more benign-stratum rows than 746.
-- Single model, single seed, no `base`-arm comparison yet.
-
-## Does the matched probe generalize? No.
-
-```bash
-./.venv/Scripts/python.exe -m src.probes.matched_ood --matched-run matched --cue-run cue --ood-run jbb
-```
-
-Four OOD contrasts. No source appears in the matched corpus, and every prompt whose text also occurs
-in matched is dropped, so nothing trained on can leak in.
-
-| contrast | benign side sounds… | matched probe @L13 | matched best | confounded probe @L13 |
-| --- | --- | --- | --- | --- |
-| advbench vs alpaca | neutral | 0.999 | 1.000 | 1.000 |
-| forbiddenq vs alpaca | neutral | **0.993** | 0.999 | 0.735 |
-| advbench vs orbench | harmful | 0.616 | 0.862 | 1.000 \* |
-| **forbiddenq vs orbench** | **harmful** | **0.508** | **0.564** | 0.555 |
-
-\* not a fair comparison — advbench and orbench are both *training* sources for the confounded
-probe, so 1.000 there is memorized provenance, not transfer.
-
-**The pattern is unambiguous: ~1.0 whenever the benign side sounds neutral, ~0.5 whenever it sounds
-harmful.** The matched probe is still reading surface harm cues, not harm.
-
-What the matched training *did* buy is phrasing robustness: on `forbiddenq vs alpaca` it scores
-0.993 against the confounded probe's 0.735, so it no longer collapses when harmful prompts switch
-from imperatives to questions. That was the failure mode the matched contrast was built to fix, and
-it fixed it. But it did not produce a harm representation.
-
-**Why the minimal pairs weren't enough.** XSTest teaches "within *this* frame, which variant is
-harmful" — homonyms, figurative language, safe targets. OR-Bench prompts are benign-but-scary by a
-different mechanism entirely. The learned distinction is specific to the *kind* of harm/cue
-dissociation seen in training, and does not transfer to a new kind. Topic-matching fixed the
-provenance confound without fixing the cue confound.
-
-### What this means for the project's question
-
-> Does a meaningful safety signal remain after removing the refusal-related direction?
-
-The honest answer from this pipeline is **not established, and the evidence leans negative**:
-
-1. The refusal direction causally controls refusal behavior — total, robust, ~100x the random
-   control (Phase 6).
-2. Erasing it barely dents in-distribution harm decodability — 0.932 → 0.905 (Phase 7).
-3. But the harm probe does not generalize when surface cues are held constant — 0.508 (this
-   section).
-
-Points 1 and 2 together would be an affirmative answer *if* point 3 held. It does not. So the
-finding is about probes, not about the model's safety representation: **linear probes on this model
-track surface harm cues rather than harm, and topic-matched minimal-pair training does not fix
-that.** That is a real, reportable result, and it is the third outcome
-[PROJECT1_PLAN.md](PROJECT1_PLAN.md) Phase 9 anticipated — "holds in-distribution, collapses OOD".
-
-To get a defensible affirmative answer you would need a harm contrast that holds surface cues
-constant *across multiple independent dissociation mechanisms* — XSTest-style homonyms, OR-Bench
-style over-refusal, and at least one more — with grouped splits across mechanisms, not just across
-frames within one mechanism.
-
-## Multi-mechanism harm contrast - partial transfer
-
-```bash
-./.venv/Scripts/python.exe -m src.data.build_multimech --config configs/qwen2.5-1.5b.yaml
-./.venv/Scripts/python.exe -m src.extract.activations --config configs/qwen2.5-1.5b.yaml     --policy multimech --adapter results/runs/Qwen2.5-1.5B-Instruct-cue/adapter --run multimech
-./.venv/Scripts/python.exe -m src.probes.multimech --run multimech --layer 13
-```
-
-The matched corpus fixed the provenance confound and still failed OOD, and the diagnosis was that
-XSTest teaches *one mechanism* of harm/cue dissociation. So the grouping variable here is the
-mechanism, and **every prompt is harmful-sounding (cue=1)** - alpaca is deliberately excluded,
-because including a neutral benign source recreates the easy contrast and hides the failure.
-
-| mechanism | benign side is benign because… | benign | harmful |
-| --- | --- | --- | --- |
-| `xstest` | lexical ambiguity ("killing time") | xstest_safe 250 | xstest_unsafe 200 |
-| `jbb` | same topic, benign intent | jbb_benign 100 | jbb_harmful 100 |
-| `orbench` | over-cautious framing | orbench_hard 250 | advbench 121 + forbidden_q 125 |
-
-n = 1146, three mechanisms, both classes in each. Leave-one-mechanism-out: train on two, test on
-the third.
-
-### Result
-
-| layer | hold jbb | hold orbench | hold xstest | mean | **min** |
-| --- | --- | --- | --- | --- | --- |
-| 10 | 0.630 | 0.295 | 0.654 | 0.526 | 0.295 |
-| 13 | 0.784 | 0.587 | 0.765 | 0.712 | 0.587 |
-| 19 | **0.900** | 0.656 | **0.885** | 0.814 | 0.656 |
-| **22** | 0.909 | **0.680** | 0.843 | 0.811 | **0.680** |
-| 28 | 0.901 | 0.666 | 0.866 | 0.811 | 0.666 |
-
-Within-mechanism ceiling at L13: **0.903** (jbb 0.942, xstest 0.864). Not computable for orbench -
-its topic groups are source-defined and single-class, so a grouped within-mechanism split has no
-valid test set there.
-
-**This is partial transfer, and it is a real update on the previous negative.**
-
-- **Two of three mechanisms transfer well**: held-out jbb reaches 0.900 and held-out xstest 0.885
-  at L19, with cluster-bootstrap intervals excluding chance (jbb 0.784 [0.708, 0.853] at L13).
-  A probe that had only learned one mechanism's signature would sit at ~0.5 here. It does not.
-- **`orbench` remains the hard one**: 0.587 at L13, peaking at 0.680. Training on lexical-ambiguity
-  and same-topic dissociations does not teach over-cautious framing.
-- **The mean passes, the minimum does not.** The gate now reports both, because averaging lets two
-  strong folds carry a weak one. Best min is 0.680 at L22; best mean is 0.814 at L19.
-
-The layer trend is consistent with everything else here: cross-mechanism transfer climbs from ~0.55
-early to ~0.81 by L19, so whatever generalizes emerges with depth.
-
-### Reconciling this with the earlier 0.508
-
-The earlier `forbiddenq vs orbench` result (0.508) used a probe trained **only on matched**
-(xstest + jbb). Here, training on xstest + jbb and testing on orbench gives 0.587-0.680 - the same
-story, slightly better because the multi-mechanism training set is larger and the evaluation is
-balanced. Both say: **the orbench-style dissociation is not learned from the other two.**
-
-The matched probe scored on the one mechanism it never saw (orbench, 496 fresh prompts) gives
-**0.592** at L13, essentially identical to the 0.587 cross-mechanism number - an independent
-confirmation that the two protocols measure the same thing.
-
-## Status
-
-| Phase | State | Key number |
-| --- | --- | --- |
-| 1. Setup | done | Qwen2.5-1.5B-Instruct, 8.59 GB card, no quantization |
-| 2. Data + behavior labels | done, gated | `cue` arm phi=0.548 · `natural` arm phi=1.000 |
-| 3. Activation extraction | done, gated | 4 runs; padding invariance 0.99989 |
-| 4. Probes | done, **re-done after audit** | matched-contrast peak 0.932 [0.868, 0.976] at L13 |
-| 5. Dissociation | done | AUROC(refusal \| benign) = 0.813 — real leakage |
-| 8 control #4 (topic-matched) | **pulled forward** — became mandatory | confounded probe: 1.000 in-dist, **0.667** matched |
-| 9 (partial, OOD transfer) | **pulled forward** — exposed the artifact | **0.005–0.19** on OOD harmful (below chance) |
-| 6. Causal validation | done, gated | suppression **+0.667** vs random **+0.006** |
-| 7. Projection | done, erasure verified at L13 | in-dist harm survives: **0.905** vs 0.932 clean, random 0.932 |
-| 9. OOD transfer (matched probe) | done | **0.508** where cues held constant — probe does not generalize |
-| Multi-mechanism contrast | done | partial transfer: mean **0.814**, worst fold **0.680** |
-| 8 (remaining controls) | not started | random-direction baseline is in Phase 7; nuisance-concept is not |
-| 10. Figures + report | not started | — |
-
-Outstanding regardless of phase:
-
-- **Test coverage is thin.** 6 tests, all on label masking and prompt formatting. Nothing covers
-  `sources.py`, `build_matched.py`, or any probe/causal module — now the bulk of the code.
-- The off-the-shelf `base` extraction arm (`--run base`, no `--adapter`) for external validity.
-- Refusal behavior on the matched corpus was never generated, so the claim that `r_harm` holds
-  refusal constant there is argued, not measured.
-- 22 rows in `natural`'s compliance cell still flagged `still_refusal=1`.
-- The C grid still saturates at 4/28 layers (early, low-signal ones).
-
-## How the probes were fixed
-
-Phase 4 was run, audited, and re-run. The audit measured each concern rather than reasoning about
-it, which mattered: two of the four suspicions were unfounded and one unsuspected problem was the
-serious one.
-
-### Verified as never broken
-
-| Check | Method | Result |
-| --- | --- | --- |
-| Leakage | 15 refits on **shuffled** train labels | test AUROC **0.480** [0.236, 0.682] — the pipeline cannot invent signal |
-| Scaler leakage | `StandardScaler` inside the `Pipeline` inside `GridSearchCV` | fit per-fold on train only; the permutation test would expose a break |
-| Inner-CV frame leakage | StratifiedKFold vs GroupKFold at L14 | both pick C=1e-3, both give test AUROC 0.956 — selection unaffected |
-| Weight extraction | `coef_ / scale_` | correct recovery of the direction in activation space |
-
-The inner-CV *score* is optimistic (0.934 vs 0.909 grouped) — a reporting flaw, not a result flaw.
-
-### Actually fixed
-
-**1. Source-confound detection (the important one).** Nothing was checking whether the label was
-simply predicted by dataset provenance. `group_confound_check` now reports the fraction of topic
-groups containing both classes:
-
-```
-cue arm     : 0/4   groups contain both classes (0%)   -> WARNING
-matched arm : 18/18 groups contain both classes (100%) -> clean
-```
-
-This is the check that would have caught the original failure automatically, before any AUROC was
-believed.
-
-**2. Confidence intervals were 1.4x too narrow.** The bootstrap resampled rows, but the matched
-test set has only 5 topic groups and rows within a family are correlated. Cluster bootstrap over
-groups is now used wherever a `group` column exists:
-
-| | 95% CI at L26 | width |
-| --- | --- | --- |
-| row-level (before) | [0.934, 0.984] | 0.059 |
-| cluster-level (now) | [0.912, 0.993] | 0.082 |
-
-Widening the interval moved the selected layer from L14 to **L13** — a consequence of honest error
-bars, not a tuning choice.
-
-**3. `TPR@1%FPR` was mislabelled.** With 80 test negatives the finest resolvable FPR is
-1/80 = 0.0125, so the filter only ever selected the zero-false-positive point. The metric now
-prints the FPR each TPR was measured at, which surfaced a number AUROC 0.96 was hiding: at **zero
-false positives the best probe catches only 0.600 of harmful prompts.**
-
-**4. C grid saturated at its boundary.** The confounded harm probe chose C = 1.0, the grid maximum,
-at **17/28 layers** — the optimum was outside the grid. Grid extended to 100 with a boundary
-warning. Still fires on 4/28 layers, all early and low-signal; the layers that matter pick 1e-2.
-
-**5. Layer selection by argmax.** AUROC plateaus from L14 to L28 within each other's intervals, so
-the argmax was noise — and biased toward late layers, exactly where entanglement with refusal is
-worst (cos +0.865 at L26 vs +0.490 at L13). Selection now takes the earliest layer statistically
-indistinguishable from the peak, the one-standard-error rule.
-
-### Still a footgun
-
-The `harm_refused` label is confounded **by construction**: in the cue arm, "refused" rows are
-advbench (harm=1) plus orbench/xstest-safe (harm=0) — different sources. The new guard warns on it,
-but the label remains selectable. Do not use it for the cue arm.
+**B.** Refusal probe after deleting r: a check that the deletion worked. Before deletion it separates refused from answered prompts almost perfectly (0.997–1.000). Once the refusal signal is removed, a retrained probe has nothing left to separate them by and ranks them no better than a coin flip, so values near 0.5 confirm the deletion. This panel concerns the deletion only, not how refusal relates to harm. The four marked layers stay above 0.60 on this split. Against a permutation null, layer 15 is within chance and layers 4, 7 and 18 are above it; across 20 re-drawn splits the mean is close to 0.5 at every layer (Section 5.3 figure), so the deletion removes refusal at all layers.
