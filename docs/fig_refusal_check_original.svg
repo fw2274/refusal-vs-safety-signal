@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" width="720" height="340" role="img" aria-labelledby="t d">
+<title id="t">Refusal probe AUROC after deleting r (original split)</title><desc id="d">Dot chart of refusal probe AUROC after deleting r, by layer, on the original train/test split. Most layers sit between 0.40 and 0.60; layers 4, 7, 15 and 18 are above 0.60.</desc>
+
+<style>
+  .bg { fill: #fcfcfb; }
+  .t1 { fill: #0b0b0b; font: 600 15px system-ui, -apple-system, Segoe UI, sans-serif; }
+  .t2 { fill: #52514e; font: 12px system-ui, -apple-system, Segoe UI, sans-serif; }
+  .lab { fill: #0b0b0b; font: 600 12px system-ui, -apple-system, Segoe UI, sans-serif; }
+  .grid { stroke: #e4e3df; stroke-width: 1; }
+  .axis { stroke: #8f8e89; stroke-width: 1; }
+  .ref { stroke: #8f8e89; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+  .s1 { stroke: #2a78d6; fill: none; stroke-width: 2; stroke-linejoin: round; }
+  .d1 { fill: #2a78d6; stroke: #fcfcfb; stroke-width: 2; }
+  .d2 { fill: #eb6834; stroke: #fcfcfb; stroke-width: 2; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #1a1a19; }
+    .t1, .lab { fill: #f0efec; }
+    .t2 { fill: #c3c2b7; }
+    .grid { stroke: #33332f; }
+    .axis, .ref { stroke: #77766f; }
+    .s1 { stroke: #3987e5; }
+    .d1 { fill: #3987e5; stroke: #1a1a19; }
+    .d2 { fill: #d95926; stroke: #1a1a19; }
+  }
+</style>
+
+<rect class="bg" width="720" height="340" rx="6"/>
+<text class="t1" x="60" y="24">Refusal probe AUROC after deleting r (original split)</text>
+<text class="t2" x="60" y="42">Near 0.5 = refusal no longer decodable. Before deletion: 0.997–1.000 at every layer.</text>
+<line class="grid" x1="60" x2="692" y1="256.6" y2="256.6"/>
+<text class="t2" x="52" y="260.6" text-anchor="end">0.4</text>
+<line class="grid" x1="60" x2="692" y1="189.7" y2="189.7"/>
+<text class="t2" x="52" y="193.7" text-anchor="end">0.5</text>
+<line class="grid" x1="60" x2="692" y1="122.9" y2="122.9"/>
+<text class="t2" x="52" y="126.9" text-anchor="end">0.6</text>
+<line class="grid" x1="60" x2="692" y1="56.0" y2="56.0"/>
+<text class="t2" x="52" y="60.0" text-anchor="end">0.7</text>
+<line class="axis" x1="60" x2="692" y1="290" y2="290"/>
+<text class="t2" x="60.0" y="308" text-anchor="middle">1</text>
+<text class="t2" x="130.2" y="308" text-anchor="middle">4</text>
+<text class="t2" x="200.4" y="308" text-anchor="middle">7</text>
+<text class="t2" x="270.7" y="308" text-anchor="middle">10</text>
+<text class="t2" x="340.9" y="308" text-anchor="middle">13</text>
+<text class="t2" x="411.1" y="308" text-anchor="middle">16</text>
+<text class="t2" x="481.3" y="308" text-anchor="middle">19</text>
+<text class="t2" x="551.6" y="308" text-anchor="middle">22</text>
+<text class="t2" x="621.8" y="308" text-anchor="middle">25</text>
+<text class="t2" x="692.0" y="308" text-anchor="middle">28</text>
+<text class="t2" x="376.0" y="330" text-anchor="middle">Layer</text>
+<text class="t2" transform="translate(16 173.0) rotate(-90)" text-anchor="middle">Refusal AUROC</text>
+<line class="axis" x1="60" x2="692" y1="189.7" y2="189.7"/>
+<text class="t2" x="692" y="205.7" text-anchor="end">chance (0.5)</text>
+<line class="ref" x1="60" x2="692" y1="122.9" y2="122.9"/>
+<text class="t2" x="692" y="116.9" text-anchor="end">0.60 flag</text>
+<polyline class="s1" points="60.0,175.2 83.4,170.3 106.8,227.4 130.2,101.9 153.6,152.8 177.0,219.2 200.4,109.6 223.9,192.4 247.3,139.4 270.7,129.2 294.1,179.4 317.5,203.4 340.9,224.5 364.3,186.3 387.7,121.7 411.1,159.5 434.5,230.3 457.9,84.3 481.3,255.9 504.7,222.0 528.1,181.6 551.6,209.8 575.0,155.0 598.4,193.4 621.8,214.6 645.2,249.1 668.6,213.5 692.0,144.4" style="stroke-width:1;opacity:.5"/>
+<circle class="d1" cx="60.0" cy="175.2" r="4"><title>Layer 1: 0.522</title></circle>
+<circle class="d1" cx="83.4" cy="170.3" r="4"><title>Layer 2: 0.529</title></circle>
+<circle class="d1" cx="106.8" cy="227.4" r="4"><title>Layer 3: 0.444</title></circle>
+<circle class="d2" cx="130.2" cy="101.9" r="5"><title>Layer 4: 0.631</title></circle>
+<text class="lab" x="130.2" y="91.9" text-anchor="middle">L4</text>
+<circle class="d1" cx="153.6" cy="152.8" r="4"><title>Layer 5: 0.555</title></circle>
+<circle class="d1" cx="177.0" cy="219.2" r="4"><title>Layer 6: 0.456</title></circle>
+<circle class="d2" cx="200.4" cy="109.6" r="5"><title>Layer 7: 0.620</title></circle>
+<text class="lab" x="200.4" y="99.6" text-anchor="middle">L7</text>
+<circle class="d1" cx="223.9" cy="192.4" r="4"><title>Layer 8: 0.496</title></circle>
+<circle class="d1" cx="247.3" cy="139.4" r="4"><title>Layer 9: 0.575</title></circle>
+<circle class="d1" cx="270.7" cy="129.2" r="4"><title>Layer 10: 0.591</title></circle>
+<circle class="d1" cx="294.1" cy="179.4" r="4"><title>Layer 11: 0.515</title></circle>
+<circle class="d1" cx="317.5" cy="203.4" r="4"><title>Layer 12: 0.480</title></circle>
+<circle class="d1" cx="340.9" cy="224.5" r="4"><title>Layer 13: 0.448</title></circle>
+<circle class="d1" cx="364.3" cy="186.3" r="4"><title>Layer 14: 0.505</title></circle>
+<circle class="d2" cx="387.7" cy="121.7" r="5"><title>Layer 15: 0.602</title></circle>
+<text class="lab" x="387.7" y="111.7" text-anchor="middle">L15</text>
+<circle class="d1" cx="411.1" cy="159.5" r="4"><title>Layer 16: 0.545</title></circle>
+<circle class="d1" cx="434.5" cy="230.3" r="4"><title>Layer 17: 0.439</title></circle>
+<circle class="d2" cx="457.9" cy="84.3" r="5"><title>Layer 18: 0.658</title></circle>
+<text class="lab" x="457.9" y="74.3" text-anchor="middle">L18</text>
+<circle class="d1" cx="481.3" cy="255.9" r="4"><title>Layer 19: 0.401</title></circle>
+<circle class="d1" cx="504.7" cy="222.0" r="4"><title>Layer 20: 0.452</title></circle>
+<circle class="d1" cx="528.1" cy="181.6" r="4"><title>Layer 21: 0.512</title></circle>
+<circle class="d1" cx="551.6" cy="209.8" r="4"><title>Layer 22: 0.470</title></circle>
+<circle class="d1" cx="575.0" cy="155.0" r="4"><title>Layer 23: 0.552</title></circle>
+<circle class="d1" cx="598.4" cy="193.4" r="4"><title>Layer 24: 0.495</title></circle>
+<circle class="d1" cx="621.8" cy="214.6" r="4"><title>Layer 25: 0.463</title></circle>
+<circle class="d1" cx="645.2" cy="249.1" r="4"><title>Layer 26: 0.411</title></circle>
+<circle class="d1" cx="668.6" cy="213.5" r="4"><title>Layer 27: 0.464</title></circle>
+<circle class="d1" cx="692.0" cy="144.4" r="4"><title>Layer 28: 0.568</title></circle>
+</svg>

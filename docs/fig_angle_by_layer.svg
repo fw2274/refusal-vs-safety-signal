@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" width="720" height="340" role="img" aria-labelledby="t d">
+<title id="t">Angle between the refusal direction r and the harm direction d</title><desc id="d">Line chart of the r-d angle by layer: near 90 degrees in layers 1-8, falling from about 85 to 34 degrees between layers 9 and 17, then levelling off near 30 degrees.</desc>
+
+<style>
+  .bg { fill: #fcfcfb; }
+  .t1 { fill: #0b0b0b; font: 600 15px system-ui, -apple-system, Segoe UI, sans-serif; }
+  .t2 { fill: #52514e; font: 12px system-ui, -apple-system, Segoe UI, sans-serif; }
+  .lab { fill: #0b0b0b; font: 600 12px system-ui, -apple-system, Segoe UI, sans-serif; }
+  .grid { stroke: #e4e3df; stroke-width: 1; }
+  .axis { stroke: #8f8e89; stroke-width: 1; }
+  .ref { stroke: #8f8e89; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+  .s1 { stroke: #2a78d6; fill: none; stroke-width: 2; stroke-linejoin: round; }
+  .d1 { fill: #2a78d6; stroke: #fcfcfb; stroke-width: 2; }
+  .d2 { fill: #eb6834; stroke: #fcfcfb; stroke-width: 2; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #1a1a19; }
+    .t1, .lab { fill: #f0efec; }
+    .t2 { fill: #c3c2b7; }
+    .grid { stroke: #33332f; }
+    .axis, .ref { stroke: #77766f; }
+    .s1 { stroke: #3987e5; }
+    .d1 { fill: #3987e5; stroke: #1a1a19; }
+    .d2 { fill: #d95926; stroke: #1a1a19; }
+  }
+</style>
+
+<rect class="bg" width="720" height="340" rx="6"/>
+<text class="t1" x="60" y="24">Angle between the refusal direction r and the harm direction d</text>
+<text class="t2" x="60" y="42">90° = unrelated, 0° = the same direction. Cue-arm model, all 28 layers.</text>
+<line class="grid" x1="60" x2="692" y1="290.0" y2="290.0"/>
+<text class="t2" x="52" y="294.0" text-anchor="end">0°</text>
+<line class="grid" x1="60" x2="692" y1="226.2" y2="226.2"/>
+<text class="t2" x="52" y="230.2" text-anchor="end">30°</text>
+<line class="grid" x1="60" x2="692" y1="162.4" y2="162.4"/>
+<text class="t2" x="52" y="166.4" text-anchor="end">60°</text>
+<line class="grid" x1="60" x2="692" y1="98.5" y2="98.5"/>
+<text class="t2" x="52" y="102.5" text-anchor="end">90°</text>
+<line class="axis" x1="60" x2="692" y1="290" y2="290"/>
+<text class="t2" x="60.0" y="308" text-anchor="middle">1</text>
+<text class="t2" x="130.2" y="308" text-anchor="middle">4</text>
+<text class="t2" x="200.4" y="308" text-anchor="middle">7</text>
+<text class="t2" x="270.7" y="308" text-anchor="middle">10</text>
+<text class="t2" x="340.9" y="308" text-anchor="middle">13</text>
+<text class="t2" x="411.1" y="308" text-anchor="middle">16</text>
+<text class="t2" x="481.3" y="308" text-anchor="middle">19</text>
+<text class="t2" x="551.6" y="308" text-anchor="middle">22</text>
+<text class="t2" x="621.8" y="308" text-anchor="middle">25</text>
+<text class="t2" x="692.0" y="308" text-anchor="middle">28</text>
+<text class="t2" x="376.0" y="330" text-anchor="middle">Layer</text>
+<text class="t2" transform="translate(16 173.0) rotate(-90)" text-anchor="middle">Angle r–d (degrees)</text>
+<line class="ref" x1="60" x2="692" y1="98.5" y2="98.5"/>
+<text class="t2" x="692" y="92.5" text-anchor="end">unrelated (90°)</text>
+<polyline class="s1" points="60.0,118.9 83.4,89.7 106.8,101.9 130.2,79.5 153.6,87.1 177.0,69.1 200.4,76.9 223.9,92.2 247.3,108.2 270.7,118.9 294.1,138.4 317.5,149.7 340.9,160.9 364.3,173.0 387.7,188.1 411.1,201.6 434.5,216.9 457.9,220.5 481.3,231.5 504.7,224.3 528.1,221.9 551.6,223.7 575.0,225.0 598.4,224.7 621.8,225.9 645.2,225.9 668.6,221.5 692.0,211.7"/>
+<circle class="d1" cx="60.0" cy="118.9" r="4"><title>Layer 1: 80.4°</title></circle>
+<circle class="d1" cx="83.4" cy="89.7" r="4"><title>Layer 2: 94.2°</title></circle>
+<circle class="d1" cx="106.8" cy="101.9" r="4"><title>Layer 3: 88.4°</title></circle>
+<circle class="d1" cx="130.2" cy="79.5" r="4"><title>Layer 4: 99.0°</title></circle>
+<circle class="d1" cx="153.6" cy="87.1" r="4"><title>Layer 5: 95.4°</title></circle>
+<circle class="d1" cx="177.0" cy="69.1" r="4"><title>Layer 6: 103.8°</title></circle>
+<circle class="d1" cx="200.4" cy="76.9" r="4"><title>Layer 7: 100.2°</title></circle>
+<circle class="d1" cx="223.9" cy="92.2" r="4"><title>Layer 8: 93.0°</title></circle>
+<circle class="d1" cx="247.3" cy="108.2" r="4"><title>Layer 9: 85.5°</title></circle>
+<circle class="d1" cx="270.7" cy="118.9" r="4"><title>Layer 10: 80.4°</title></circle>
+<circle class="d1" cx="294.1" cy="138.4" r="4"><title>Layer 11: 71.3°</title></circle>
+<circle class="d1" cx="317.5" cy="149.7" r="4"><title>Layer 12: 66.0°</title></circle>
+<circle class="d1" cx="340.9" cy="160.9" r="4"><title>Layer 13: 60.7°</title></circle>
+<circle class="d1" cx="364.3" cy="173.0" r="4"><title>Layer 14: 55.0°</title></circle>
+<circle class="d1" cx="387.7" cy="188.1" r="4"><title>Layer 15: 47.9°</title></circle>
+<circle class="d1" cx="411.1" cy="201.6" r="4"><title>Layer 16: 41.6°</title></circle>
+<circle class="d1" cx="434.5" cy="216.9" r="4"><title>Layer 17: 34.4°</title></circle>
+<circle class="d1" cx="457.9" cy="220.5" r="4"><title>Layer 18: 32.7°</title></circle>
+<circle class="d1" cx="481.3" cy="231.5" r="4"><title>Layer 19: 27.5°</title></circle>
+<circle class="d1" cx="504.7" cy="224.3" r="4"><title>Layer 20: 30.9°</title></circle>
+<circle class="d1" cx="528.1" cy="221.9" r="4"><title>Layer 21: 32.0°</title></circle>
+<circle class="d1" cx="551.6" cy="223.7" r="4"><title>Layer 22: 31.2°</title></circle>
+<circle class="d1" cx="575.0" cy="225.0" r="4"><title>Layer 23: 30.5°</title></circle>
+<circle class="d1" cx="598.4" cy="224.7" r="4"><title>Layer 24: 30.7°</title></circle>
+<circle class="d1" cx="621.8" cy="225.9" r="4"><title>Layer 25: 30.1°</title></circle>
+<circle class="d1" cx="645.2" cy="225.9" r="4"><title>Layer 26: 30.1°</title></circle>
+<circle class="d1" cx="668.6" cy="221.5" r="4"><title>Layer 27: 32.2°</title></circle>
+<circle class="d1" cx="692.0" cy="211.7" r="4"><title>Layer 28: 36.8°</title></circle>
+<text class="lab" x="348.9" y="152.9">L13 (headline layer): 61°</text>
+<text class="lab" x="481.3" y="253.5" text-anchor="middle">min 27.5° at L19</text>
+</svg>
