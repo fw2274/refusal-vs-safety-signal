@@ -36,6 +36,20 @@ from sklearn.preprocessing import StandardScaler
 C_GRID = [1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0]
 
 
+def n_layers_of(act_dir: Path) -> int:
+    return json.loads((Path(act_dir) / "meta.json").read_text())["n_layers"]
+
+
+def sweep_layers(n_layers: int) -> list[int]:
+    """Every third layer from 1; for 28 layers this is the original [1, 4, ..., 28]."""
+    return list(range(1, n_layers + 1, 3))
+
+
+def default_layer(n_layers: int) -> int:
+    """Same relative depth as L13 of Qwen's 28 (0.46), so cross-model layers line up."""
+    return round(n_layers * 13 / 28)
+
+
 def make_probe() -> GridSearchCV:
     # L2 is LogisticRegression's default; passing penalty= explicitly is deprecated in sklearn 1.8+.
     pipe = Pipeline(
