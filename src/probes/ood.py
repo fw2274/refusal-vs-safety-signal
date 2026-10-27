@@ -2,7 +2,7 @@
 
     python -m src.probes.ood --run cue --ood-run jbb
 
-Fixes the artifact documented in README ("the cosine level is not robust"). Inside the SFT corpus
+Fixes the artifact documented in REPRODUCE.md ("the cosine level is not robust"). Inside the SFT corpus
 every harm direction overlaps one of r_ref's source groups, because there are only three groups
 and r_ref = [orbench+xstest] - [alpaca]. At layer 12 that put the "same" cosine anywhere in
 [-0.447, +0.486].

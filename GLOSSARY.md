@@ -1,7 +1,7 @@
 # Glossary
 
 Terminology behind the four questions an advisor or reviewer will actually ask about this
-project. Every number here comes from this repo's own runs — see [README.md](README.md) for the
+project. Every number here comes from this repo's own runs — see [REPRODUCE.md](REPRODUCE.md) for the
 result tables and [SFT_DESIGN.md](SFT_DESIGN.md) for the design argument.
 
 - [1. Why 1.5B?](#1-why-15b)
@@ -115,7 +115,7 @@ sampling frame itself rather than by a statistical correction.
 
 **3. Evidence the stratification does real work.** Same layer (13), same activations, same
 model, measured against the topic-matched harm direction `d` (XSTest pairs + JailbreakBench
-twins, see README "Fixing the harm contrast with topic-matched data"):
+twins, see REPRODUCE.md "Fixing the harm contrast with topic-matched data"):
 
 | Estimator | cos(r, d) at layer 13 | refusal AUROC after erasing r | harm AUROC after erasing r (clean 0.932) |
 | --- | --- | --- | --- |
