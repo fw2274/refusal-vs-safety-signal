@@ -1,0 +1,66 @@
+run=llama-cue  label=harm  train=1050  test=350  pos_rate_test=0.274
+CI: row-level bootstrap (no topic groups in this run)
+source/label overlap: 0/4 groups contain BOTH classes (0%)
+  WARNING: the label is largely determined by group/source. A probe can score here
+  by detecting provenance rather than the concept, and will not transfer. Use a
+  matched contrast (see src/data/build_matched.py).
+
+layer   AUROC            95% CI  cv_auroc  bal_acc    TPR    @FPR       C
+    1   1.000 [ 1.000, 1.000]     1.000    0.996  1.000  0.0000   1e-01
+    2   1.000 [ 1.000, 1.000]     1.000    0.990  1.000  0.0000   1e+00
+    3   1.000 [ 1.000, 1.000]     1.000    0.998  1.000  0.0000   1e+00
+    4   1.000 [ 0.999, 1.000]     1.000    0.993  0.990  0.0000   1e-01
+    5   1.000 [ 1.000, 1.000]     1.000    0.998  1.000  0.0039   1e-01
+    6   1.000 [ 1.000, 1.000]     1.000    1.000  1.000  0.0000   1e+00
+    7   1.000 [ 1.000, 1.000]     1.000    0.998  1.000  0.0039   1e-01
+    8   1.000 [ 0.999, 1.000]     1.000    0.993  1.000  0.0039   1e+00
+    9   1.000 [ 1.000, 1.000]     1.000    0.998  1.000  0.0000   1e+00
+   10   1.000 [ 1.000, 1.000]     1.000    0.998  1.000  0.0039   1e+00
+   11   1.000 [ 1.000, 1.000]     1.000    0.998  1.000  0.0039   1e+00
+   12   1.000 [ 0.999, 1.000]     1.000    0.998  1.000  0.0039   1e+00
+   13   1.000 [ 0.999, 1.000]     1.000    0.998  1.000  0.0039   1e+00
+   14   1.000 [ 0.999, 1.000]     1.000    0.998  1.000  0.0039   1e-01
+   15   1.000 [ 1.000, 1.000]     1.000    0.998  1.000  0.0039   1e+00
+   16   1.000 [ 1.000, 1.000]     1.000    0.998  1.000  0.0039   1e-01
+
+peak AUROC 1.000 [1.000, 1.000] at layer 1 (depth 0.06)
+GATE: FAIL - AUROC 1.000 peaks at depth 0.06.
+  A trained probe saturating this early means the task is separable from
+  SURFACE features - dataset provenance - not harm semantics.
+  Do NOT select this layer. Select by topic-matched AUROC: src/probes/ood.py
+wrote results\probes\llama-cue\harm_layerwise.csv
+matched: train=490 test=160 (grouped by topic family)
+confounded probe trained on: llama-cue (n=1050)
+
+layer  matched AUROC           95% CI  confounded->matched  cos_clean
+    1          0.634 [ 0.418, 0.820]                0.660     +0.631
+    2          0.793 [ 0.743, 0.855]                0.592     +0.191
+    3          0.858 [ 0.780, 0.929]                0.602     +0.193
+    4          0.825 [ 0.783, 0.881]                0.673     +0.408
+    5          0.882 [ 0.768, 0.967]                0.772     +0.657
+    6          0.921 [ 0.844, 0.977]                0.781     +0.755
+    7          0.963 [ 0.913, 0.994]                0.950     +0.851
+    8          0.980 [ 0.956, 0.999]                0.962     +0.747
+    9          0.978 [ 0.946, 0.998]                0.954     +0.762
+   10          0.986 [ 0.963, 0.999]                0.950     +0.803
+   11          0.986 [ 0.964, 0.999]                0.960     +0.749
+   12          0.988 [ 0.974, 0.999]                0.958     +0.740
+   13          0.988 [ 0.978, 0.999]                0.958     +0.708
+   14          0.986 [ 0.976, 0.998]                0.966     +0.707
+   15          0.985 [ 0.970, 0.998]                0.960     +0.691
+   16          0.981 [ 0.965, 0.998]                0.963     +0.719
+
+matched-trained peak: AUROC 0.988 [0.978, 0.999] at layer 13 (depth 0.81), cos_clean +0.708
+confounded probe on the same rows, that layer: 0.958
+confounded probe, best over all layers: 0.966
+
+matched AUROC peak within the first 30% of layers: 0.858
+  (the confounded probe hit 1.000 at depth 0.14; a matched contrast should NOT,
+   because surface form no longer separates the classes)
+
+selected layer (earliest within the peak's 95% CI): L8 (depth 0.50)
+  AUROC 0.980 [0.956, 0.999]   cos_clean +0.747
+  vs argmax L13 (depth 0.81): AUROC 0.988, cos_clean +0.708
+
+GATE: PASS - harm is decodable, and not from surface form
+wrote results\probes\llama-matched\matched_vs_confounded.csv

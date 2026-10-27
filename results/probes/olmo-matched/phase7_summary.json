@@ -1,0 +1,11 @@
+{
+  "layer": 7,
+  "leace_erasure_verified": true,
+  "max_ref_after_dim": 0.6925105485232067,
+  "max_ref_after_leace": 0.6145503691983122,
+  "clean": 0.9493750000000001,
+  "transfer": 0.8884375,
+  "retrain": 0.94453125,
+  "random": 0.9498437500000001,
+  "leace_retrain": 0.9485937500000001
+}

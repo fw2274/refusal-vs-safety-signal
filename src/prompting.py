@@ -42,8 +42,16 @@ def prompt_ids(tok, user_prompt: str) -> list[int]:
 
 
 def turn_end_id(tok) -> int:
-    """End-of-turn token: <|im_end|> for Qwen/ChatML, else the tokenizer's EOS (<|eot_id|> for Llama 3.x)."""
-    tid = tok.convert_tokens_to_ids("<|im_end|>")
-    if tid is not None and tid >= 0:
-        return tid
-    return tok.eos_token_id
+    """End-of-turn token, read off the chat template rather than guessed from the vocab.
+
+    Renders a finished assistant turn and takes the first token after its content: <|im_end|> for
+    Qwen/ChatML, <|eot_id|> for Llama 3.x, <|endoftext|> for OLMo 2. Looking up "<|im_end|>" by
+    name is wrong for OLMo 2: the token exists in its vocab but its template never emits it.
+    """
+    sentinel = "TURN_END_PROBE"
+    text = tok.apply_chat_template(
+        messages("x") + [{"role": "assistant", "content": sentinel}], tokenize=False,
+        date_string=DATE_STRING,
+    )
+    tail = text.split(sentinel, 1)[1]
+    return tok(tail, add_special_tokens=False)["input_ids"][0]

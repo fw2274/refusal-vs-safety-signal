@@ -16,10 +16,15 @@ from transformers import AutoTokenizer
 from src.prompting import SYSTEM, prompt_ids, prompt_text, turn_end_id
 from src.train.sft_lora import MaskedSFTDataset, collate
 
-MODELS = ["Qwen/Qwen2.5-1.5B-Instruct", "meta-llama/Llama-3.2-1B-Instruct"]
+# model -> the token its chat template closes an assistant turn with
+TURN_END = {
+    "Qwen/Qwen2.5-1.5B-Instruct": "<|im_end|>",
+    "meta-llama/Llama-3.2-1B-Instruct": "<|eot_id|>",
+    "allenai/OLMo-2-0425-1B-Instruct": "<|endoftext|>",  # NOT <|im_end|>, though it is in the vocab
+}
 
 
-@pytest.fixture(scope="module", params=MODELS)
+@pytest.fixture(scope="module", params=list(TURN_END))
 def tok(request):
     t = AutoTokenizer.from_pretrained(request.param)
     if t.pad_token is None:
@@ -32,7 +37,7 @@ def test_prompt_text_ends_at_assistant_prefix(tok):
     text = prompt_text(tok, "What is 2+2?")
     assert SYSTEM in text
     assert "What is 2+2?" in text
-    assert text.rstrip().endswith(("assistant", "assistant<|end_header_id|>")), text[-40:]
+    assert text.rstrip().endswith(("assistant", "assistant<|end_header_id|>", "<|assistant|>")), text[-40:]
 
 
 def test_prompt_ids_roundtrip(tok):
@@ -99,4 +104,4 @@ def test_prompt_text_has_no_live_date(tok):
 
 def test_turn_end_is_end_of_turn_token(tok):
     """Labels must end on the token that closes an assistant turn, not end-of-document."""
-    assert tok.convert_ids_to_tokens(turn_end_id(tok)) in ("<|im_end|>", "<|eot_id|>")
+    assert tok.convert_ids_to_tokens(turn_end_id(tok)) == TURN_END[tok.name_or_path]

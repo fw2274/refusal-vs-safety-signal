@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +31,10 @@ from sklearn.metrics import balanced_accuracy_score, roc_auc_score, roc_curve
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+
+# Parallel CV workers per probe fit. Each worker copies the activations, so on a wide model (Llama,
+# d_model 2048) one worker per core ran the machine out of memory. Unset keeps all cores.
+N_JOBS = int(os.environ.get("PROBE_N_JOBS", "-1"))
 
 # Extended past 1.0: the confounded harm probe chose C == 1.0 at 17/28 layers, i.e. the optimum
 # lay outside the grid. main() now warns whenever the choice lands on the boundary.
@@ -55,7 +60,7 @@ def make_probe() -> GridSearchCV:
     pipe = Pipeline(
         [("scale", StandardScaler()), ("lr", LogisticRegression(max_iter=2000))]
     )
-    return GridSearchCV(pipe, {"lr__C": C_GRID}, scoring="roc_auc", cv=5, n_jobs=-1)
+    return GridSearchCV(pipe, {"lr__C": C_GRID}, scoring="roc_auc", cv=5, n_jobs=N_JOBS)
 
 
 def tpr_at_fpr(y: np.ndarray, s: np.ndarray, target: float = 0.01) -> tuple[float, float]:
