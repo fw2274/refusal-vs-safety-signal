@@ -6,42 +6,46 @@
 
 ## Abstract
 
-(Draft.) Is a model's refusal the same signal as its recognition of harm? We fine-tune Qwen2.5-1.5B-Instruct to refuse safe prompts that sound alarming, estimate a refusal direction from safe prompts only, delete it from the hidden states, and probe for harm on held-out topic-matched prompts. Deletion removes refusal (a refusal probe falls to chance across 20 re-drawn splits), but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13), and deleting a random direction leaves it unchanged. The drop is significant only at layers 10, 12 and 13 (about 0.03), so harm and refusal are partly separable. Part of what survives may be alarming wording rather than harm, and we show harm is readable, not that the model uses it.
-
-(Maybe we should pick multiple models, and repeat it on different sizes and configurations too to compare refusal training effectiveness.)
+(Draft.) Is a model's refusal the same signal as its recognition of harm? We fine-tune Qwen2.5-1.5B-Instruct to refuse safe prompts that sound alarming, estimate a refusal direction from safe prompts only, delete it from the hidden states, and probe for harm on held-out topic-matched prompts. Deletion removes refusal (a refusal probe falls to chance across 20 re-drawn splits), but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13), and deleting a random direction leaves it unchanged. The drop is significant only at layers 10, 12 and 13 (about 0.03), so harm and refusal are partly separable. The result replicates in Llama-3.2-1B-Instruct and OLMo-2-1B-Instruct, where deletion costs harm decodability almost nothing at any layer. The geometry is model-specific: in Qwen and OLMo the two directions are near-perpendicular in early layers and converge past mid-depth, while in Llama they are aligned from the first layers. Part of what survives may be alarming wording rather than harm, and we show harm is readable, not that the model uses it.
 
 ## 1. Introduction
 
 Refusal in safety-tuned language models is carried largely by one direction in the hidden states (Arditi et al., 2024), and harmfulness can be read from the same states with linear probes. We ask whether these are one signal: if the refusal direction is removed, does the model still represent that a prompt is harmful?
 
-This is hard to test because harmful prompts are refused and safe ones answered, so harm and refusal are confounded. We fine-tune Qwen2.5-1.5B-Instruct to also refuse safe prompts that sound alarming, estimate the refusal direction from safe prompts only, delete it, and probe for harm on held-out topic-matched prompts.
+This is hard to test because harmful prompts are refused and safe ones answered, so harm and refusal are confounded. We fine-tune Qwen2.5-1.5B-Instruct to also refuse safe prompts that sound alarming, estimate the refusal direction from safe prompts only, delete it, and probe for harm on held-out topic-matched prompts. We then repeat the whole pipeline on Llama-3.2-1B-Instruct and OLMo-2-1B-Instruct, two other model families.
 
-Refusal falls to chance after deletion, but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13). Our contributions are:
+In Qwen, refusal falls to chance after deletion, but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13). The same holds in Llama and OLMo, with even smaller drops. Our contributions are:
 
 - a design that estimates the refusal direction with harm held fixed;
 - a layer-wise deletion test with random-direction, permutation and re-split controls;
-- evidence that harm and refusal are partly separable, bounded by a wording confound (Section 5.4).
+- evidence that harm and refusal are partly separable, bounded by a wording confound (Section 5.4);
+- a replication in three model families, showing that the deletion result holds in all three while the layer-wise geometry differs (Section 5.5).
 
 ## 2. Background and related work
 
-*Template: what each subsection should cite (delete when filled).*
-
-| Section | What to read and cite | Already in the draft? |
-| --- | --- | --- |
-| 2.1 Safety fine-tuning and refusal | Safety training (RLHF, instruction tuning); over-refusal benchmarks XSTest (Röttger et al.) and OR-Bench (Cui et al.) | Benchmarks named in 4.1 and 5.4, not yet cited |
-| 2.2 Linear probes and representation engineering | Linear probing (Alain & Bengio); control tasks (Hewitt & Liang); representation engineering (Zou et al., 2023) | No |
-| 2.3 Steering and direction removal | Refusal direction (Arditi et al., 2024); concept erasure: INLP (Ravfogel et al.), LEACE (Belrose et al.) | Arditi in the Introduction; LEACE used as a cross-check |
-| 2.4 Causal versus correlational | Amnesic probing (Elazar et al., 2021): readable is not the same as used; closest prior work, "LLMs Encode Harmfulness and Refusal Separately" (Zhao et al., 2025; verify) | No |
-
 ### 2.1 Safety fine-tuning and refusal
 
-We fine-tune Qwen2.5-1.5B-Instruct under two refusal rules (Section 4.1).
+Chat models learn to refuse harmful requests through instruction tuning and reinforcement learning from human feedback (Ouyang et al., 2022; Bai et al., 2022). The learned behaviour fails in both directions. Jailbreaks make models answer harmful requests (Wei et al., 2023; Zou et al., 2023b), and models also refuse safe prompts that look like harmful ones. XSTest (Röttger et al., 2024) and OR-Bench (Cui et al., 2025) measure this over-refusal. OR-Bench finds safety and over-refusal strongly correlated across 32 models, which suggests much of the measured safety is wording-driven caution.
+
+Our cue arm deliberately amplifies over-refusal. It is what supplies safe prompts that are refused, so the refusal direction can be estimated with harm held fixed (Section 4.1). Harmful prompts come from AdvBench (Zou et al., 2023b), JailbreakBench (Chao et al., 2024) and Forbidden Questions (Shen et al., 2024), and plain safe prompts from Alpaca (Taori et al., 2023). Fine-tuning uses LoRA (Hu et al., 2022).
 
 ### 2.2 Linear probes and representation engineering
 
+A linear probe tests whether a property can be read linearly from hidden states (Alain & Bengio, 2016). A high score has two known weaknesses. The probe can learn the task itself rather than read it from the model, which control tasks are designed to expose (Hewitt & Liang, 2019; Belinkov, 2022). And it shows only that information is present, not that the model uses it. The difference between class means is a simpler alternative to a trained classifier's weights, and often matches the model's causal behaviour better (Marks & Tegmark, 2024). Representation engineering (Zou et al., 2023a) uses such directions to read and control concepts, harmfulness among them.
+
+We use logistic probes to measure how decodable harm is, and difference-of-means for both directions. The topic-matched pairs (Section 4.3) act as our control: wording and topic are the same on both sides, so a probe cannot score well by reading them.
+
 ### 2.3 Activation steering and direction removal
 
+Adding a direction to the hidden states steers a model's behaviour (Turner et al., 2023; Rimsky et al., 2024). Arditi et al. (2024) showed that refusal in 13 open chat models is mediated by a single difference-of-means direction: removing it stops refusal, and adding it makes the model refuse safe requests. This is the refusal direction we delete. Wollschläger et al. (2025) find that refusal can also be mediated by multi-dimensional cones, and that directions at right angles can still interact when the model is intervened on. Both points matter here, because we delete a single direction and read the angle between directions.
+
+Concept erasure removes a concept from the representation linearly. INLP (Ravfogel et al., 2020) repeatedly projects out a classifier's direction, and LEACE (Belrose et al., 2023) is a closed-form erasure that no linear classifier can undo on the fitting data. We use rank-1 difference-of-means deletion and run INLP and LEACE as cross-checks. With fewer fitting rows than dimensions, both under-erase on held-out prompts ([REPRODUCE.md](REPRODUCE.md), Phase 7).
+
 ### 2.4 Causal versus correlational interpretability
+
+Amnesic probing (Elazar et al., 2021) removes a property from the representation and measures how the model's predictions change. It separates information that can be read from information that is used. Our deletion is applied to saved hidden states, so it answers only the first question (Section 6.2).
+
+The closest prior work is Zhao et al. (2025), who report that LLMs encode harmfulness and refusal as separate concepts at different token positions. In their account, harm is read at the instruction's last token and refusal at the template tokens that follow it. Steering along the harm direction changes whether the model judges a prompt harmful, and some jailbreaks suppress refusal without changing that judgement. We test a related claim in a different way. We read both directions at one position, the last prompt token. We hold harm fixed when estimating refusal by training the model to over-refuse. And we test separability by deleting refusal and probing for harm, rather than by steering. Our results agree with theirs in direction: harm survives deletion of the refusal direction, in three model families (Section 5.5).
 
 ## 3. Problem setup
 
@@ -241,6 +245,72 @@ Our data cannot separate (1) from (2). Because the cue arm was trained to refuse
 
 Sources: [matched\_ood\_summary.json](results/probes/matched/matched_ood_summary.json), [multimech\_summary.json](results/probes/multimech/multimech_summary.json).
 
+### 5.5 Generalization across models
+
+The deletion result holds in two more model families: harm stays decodable after deleting r in Llama-3.2-1B and OLMo-2-1B, as in Qwen. The early-layer geometry does not: Llama has no layer where harm and refusal are close to orthogonal.
+
+**Setup.** We repeat Tasks 1–3 on Llama-3.2-1B-Instruct (Meta; Grattafiori et al., 2024) and OLMo-2-0425-1B-Instruct (AI2; Team OLMo, 2025). Both have 16 layers and hidden size 2048, against Qwen's 28 layers and 1536 (Qwen Team, 2024). Everything else is unchanged:
+
+- the same prompts, splits and LoRA settings;
+- r is still the rank-1 difference of means on the safe prompts of the cue corpus;
+- the same deletion test: a cluster bootstrap over topic groups, a permutation null and 20 re-splits.
+
+Because the layer counts differ, layers are compared by relative depth (layer / number of layers). Two chat-template fixes were needed. Llama's template writes the current date into every prompt, so we pin it. OLMo ends a turn with `<|endoftext|>`, not the `<|im_end|>` token in its vocabulary.
+
+![Angle between r and d, harm AUROC and refusal AUROC before and after deleting r, by relative depth, for Qwen2.5-1.5B, Llama-3.2-1B and OLMo-2-1B](results/figures/compare_models.png)
+
+<sub>Data: [compare_models.csv](results/figures/compare_models.csv). Regenerate with `python -m src.probes.compare_models --pair Qwen-1.5B cue matched --pair Llama-1B llama-cue llama-matched --pair OLMo-2-1B olmo-cue olmo-matched`.</sub>
+
+*Figure: geometry and deletion across three models, by relative depth.*
+
+- **Left:** angle between r and the harm direction d. Deletion makes it 90° by construction.
+- **Middle:** matched harm probe AUROC before deletion (solid) and after deleting r (dashed, probe retrained).
+- **Right:** refusal probe AUROC on the safe prompts of the cue corpus, before and after deletion.
+
+The same panels by layer number, and the per-layer values, are in the Appendix ("Per-layer results across models").
+
+*Table: summary per model.* Refusal rates are on held-out prompts. The early and late angle ranges cover the first 30% and the last 40% of depth.
+
+| | Qwen2.5-1.5B | Llama-3.2-1B | OLMo-2-1B |
+| --- | --- | --- | --- |
+| Layers / hidden size | 28 / 1536 | 16 / 2048 | 16 / 2048 |
+| Base model refusal, safe but alarming prompts | 0.65 | 0.14 | 0.28 |
+| After SFT: safe plain / safe alarming / harmful | 0.02 / 0.97 / 0.98 | 0.02 / 1.00 / 1.00 | 0.04 / 1.00 / 1.00 |
+| Matched harm AUROC, peak | 0.963 (L26) | 0.988 (L13) | 0.966 (L15) |
+| Angle r–d, early layers | 80–104° | 51–79° | 90–112° |
+| Angle r–d, late layers | 27–37° | 37–46° | 39–44° |
+| Largest harm drop after deletion | 0.031 (L11) | 0.002 (L11) | 0.018 (L4) |
+| Layers where the drop's 95% interval excludes 0 | 10, 12, 13, 24 | none | 6 |
+| Refusal AUROC after deletion | 0.40–0.66 | 0.37–0.64 | 0.38–0.69 |
+| Layers failing the deletion check (original split) | 4, 7, 18 | 15 | 11, 13 |
+
+**What the figure shows.**
+
+- **Angle.** Qwen and OLMo start near 90° and fall to 30–45° past mid-depth. Llama starts lower, at 51–79°, and is already at 32° by depth 0.44.
+- **Harm.** In all three models the harm curves before and after deletion nearly coincide. Llama's are the highest, at 0.98–0.99 past mid-depth.
+- **Refusal.** Refusal AUROC is about 1.00 before deletion and 0.37–0.69 after, in every model.
+
+**Comparison across the three models.**
+
+- **The deletion result generalizes.** Harm survives deleting r in all three models. Only one drop survives correction for the number of layers: Qwen's at L13 (0.027, p = 0.001). OLMo's at L6 (0.010, p = 0.006) does not, because the threshold for 16 layers is p = 0.003. Llama has no significant drop at any layer.
+- **Partial sharing (H3) holds in all three.** In late layers r and d are only 27–46° apart, yet deleting r costs harm almost nothing. Harm must also be carried in directions r does not cover.
+- **The early-layer geometry is model-specific.** Qwen and OLMo show the pattern "near-orthogonal where harm is weakly decodable, entangled where it is strongly decodable". Llama does not: r and d share direction from the first layers on.
+
+  One possible reason, which we have not tested: base Llama rarely refuses safe but alarming prompts (0.14, against 0.65 for Qwen). The cue rule was therefore mostly new to Llama, and SFT may have built its refusal on top of the harm features rather than beside them.
+- **The deletion-check failures are not persistent.** Layers that fail on the original split stay inside the null on most of the 20 re-splits (at most 30% fail), so they look like split noise, as in Qwen.
+
+**Caveats.**
+
+- Each model has one seed and one SFT policy.
+- In the Llama and OLMo policy checks, the model answered 49 and 48 safe prompts, just under the 50 the check asks for. The two runs therefore show as FAIL on that check alone, while their refusal rates match the taught rule.
+
+Sources:
+
+- [compare_models.csv](results/figures/compare_models.csv)
+- deletion statistics: [Llama](results/probes/llama-matched/deletion_stats.csv), [OLMo](results/probes/olmo-matched/deletion_stats.csv)
+- harm probes: [Llama](results/probes/llama-matched/matched_vs_confounded.csv), [OLMo](results/probes/olmo-matched/matched_vs_confounded.csv)
+- policy checks: [Llama](results/runs/Llama-3.2-1B-Instruct-cue/policy_eval.json), [OLMo](results/runs/OLMo-2-0425-1B-Instruct-cue/policy_eval.json)
+
 ## 6. Discussion
 
 ### 6.1 What the results support
@@ -250,6 +320,8 @@ Sources: [matched\_ood\_summary.json](results/probes/matched/matched_ood_summary
 **The deletion itself works.** A refusal probe retrained after deletion falls to chance (0.448 at layer 13, against 0.997–1.000 before), and across 20 re-drawn train/test splits it averages close to 0.5 at every layer. The four layers that exceeded 0.60 on the original split reflect that split, not residual refusal.
 
 **The overlap is concentrated in the middle layers.** Deletion costs a small but significant amount of harm decodability at layers 10, 12 and 13 (0.026–0.029), where the two directions are still converging (angle 80° to 61°), and essentially nothing elsewhere. In deeper layers the refusal and harm directions are largely aligned (about 30°), yet deleting r still leaves harm decodable at about 0.95. Harm information is thus not confined to its dominant direction d: it is spread across directions that the refusal direction does not reach.
+
+**The result replicates across model families, the geometry does not.** In Llama-3.2-1B and OLMo-2-1B, too, harm stays decodable after r is deleted, and the deletion check passes. Llama shows no significant drop at any layer, and OLMo none that survives correction for 16 layers (Section 5.5). The early-layer pattern differs. In Qwen and OLMo, r and d start close to perpendicular and converge past mid-depth, while in Llama they share direction from the first layers on. So "harm survives refusal deletion" is a property of all three models, while where and how fast the two directions converge depends on the model.
 
 ### 6.2 What remains ambiguous
 
@@ -270,7 +342,7 @@ Our result does not test whether safety training in general learns surface featu
 **Setup**
 
 - **The refusal direction may carry wording, not refusal.** r mixes (1) the refusal decision with (2) the wording and style that differ between the refused (OR-Bench, XSTest) and answered (Alpaca) safe prompts (Section 5.4), and the harm probe partly reads the same wording. This is the main threat to the claim.
-- **One model, one seed.** All results are from Qwen2.5-1.5B-Instruct with a single rank-16 LoRA fine-tune. Larger models, other families and other seeds may separate harm and refusal differently.
+- **Three small models, one seed each.** Results come from Qwen2.5-1.5B-Instruct, Llama-3.2-1B-Instruct and OLMo-2-1B-Instruct, each with a single rank-16 LoRA fine-tune. The deletion result holds in all three, but the early-layer geometry differs between them (Section 5.5). Larger models and other seeds may separate harm and refusal differently. The generalization tests of Section 5.4 were run on Qwen only.
 
 **Analytical**
 
@@ -284,13 +356,42 @@ Our result does not test whether safety training in general learns surface featu
 
 ## 8. Conclusion
 
-Yes: after the refusal direction is deleted, the information that a prompt is harmful remains linearly decodable in Qwen2.5-1.5B-Instruct's hidden states at every layer, losing only a small amount at layers 10, 12 and 13. Harm and refusal are therefore partly separable (H3).
+Yes: after the refusal direction is deleted, the information that a prompt is harmful remains linearly decodable at every layer in all three models we tested: Qwen2.5-1.5B-Instruct, Llama-3.2-1B-Instruct and OLMo-2-1B-Instruct. The cost of deletion is small everywhere. Qwen loses about 0.03 AUROC at layers 10, 12 and 13, OLMo 0.010 at layer 6 (not significant after correction for the number of layers), and Llama nothing measurable. Harm and refusal are therefore partly separable (H3), and this holds across three model families rather than one model.
 
-Two qualifications bound this claim. The refusal direction comes from a model trained to refuse on alarming wording, and the harm probe itself partly reads that wording. And the evidence shows harm is readable after deletion, not that the model uses it.
+The models differ in geometry. In Qwen and OLMo the two directions are near-perpendicular in early layers and converge to 30–45° past mid-depth, while in Llama they are aligned from the first layers. How far harm and refusal share a direction is therefore model-specific, even though harm survives refusal deletion in every model.
 
-The cleanest next step is to estimate the refusal direction from the original model's own over-refusal, holding harm and wording fixed, and test whether harm survives its removal inside the forward pass.
+Two qualifications bound this claim. The refusal direction comes from models trained to refuse on alarming wording, and the harm probe itself partly reads that wording (shown for Qwen). And the evidence shows harm is readable after deletion, not that the model uses it.
+
+The cleanest next step is to estimate the refusal direction from each original model's own over-refusal, holding harm and wording fixed, and test whether harm survives its removal inside the forward pass.
 
 ## References
+
+- Alain, G., & Bengio, Y. (2016). Understanding intermediate layers using linear classifier probes. *arXiv:1610.01644*.
+- Arditi, A., Obeso, O., Syed, A., Paleka, D., Panickssery, N., Gurnee, W., & Nanda, N. (2024). Refusal in language models is mediated by a single direction. *NeurIPS 2024*. arXiv:2406.11717.
+- Bai, Y., et al. (2022). Training a helpful and harmless assistant with reinforcement learning from human feedback. *arXiv:2204.05862*.
+- Belinkov, Y. (2022). Probing classifiers: Promises, shortcomings, and advances. *Computational Linguistics*, 48(1). arXiv:2102.12452.
+- Belrose, N., Schneider-Joseph, D., Ravfogel, S., Cotterell, R., Raff, E., & Biderman, S. (2023). LEACE: Perfect linear concept erasure in closed form. *NeurIPS 2023*. arXiv:2306.03819.
+- Chao, P., et al. (2024). JailbreakBench: An open robustness benchmark for jailbreaking large language models. *NeurIPS 2024 Datasets and Benchmarks*. arXiv:2404.01318.
+- Cui, J., Chiang, W.-L., Stoica, I., & Hsieh, C.-J. (2025). OR-Bench: An over-refusal benchmark for large language models. *ICML 2025*. arXiv:2405.20947.
+- Elazar, Y., Ravfogel, S., Jacovi, A., & Goldberg, Y. (2021). Amnesic probing: Behavioral explanation with amnesic counterfactuals. *TACL*, 9. arXiv:2006.00995.
+- Grattafiori, A., et al. (2024). The Llama 3 herd of models. *arXiv:2407.21783*.
+- Hewitt, J., & Liang, P. (2019). Designing and interpreting probes with control tasks. *EMNLP 2019*. arXiv:1909.03368.
+- Hu, E. J., et al. (2022). LoRA: Low-rank adaptation of large language models. *ICLR 2022*. arXiv:2106.09685.
+- Marks, S., & Tegmark, M. (2024). The geometry of truth: Emergent linear structure in large language model representations of true/false datasets. *COLM 2024*. arXiv:2310.06824.
+- Ouyang, L., et al. (2022). Training language models to follow instructions with human feedback. *NeurIPS 2022*. arXiv:2203.02155.
+- Qwen Team (2024). Qwen2.5 technical report. *arXiv:2412.15115*.
+- Ravfogel, S., Elazar, Y., Gonen, H., Twiton, M., & Goldberg, Y. (2020). Null it out: Guarding protected attributes by iterative nullspace projection. *ACL 2020*. arXiv:2004.07667.
+- Rimsky, N., Gabrieli, N., Schulz, J., Tong, M., Hubinger, E., & Turner, A. M. (2024). Steering Llama 2 via contrastive activation addition. *ACL 2024*. arXiv:2312.06681.
+- Röttger, P., Kirk, H. R., Vidgen, B., Attanasio, G., Bianchi, F., & Hovy, D. (2024). XSTest: A test suite for identifying exaggerated safety behaviours in large language models. *NAACL 2024*. arXiv:2308.01263.
+- Shen, X., Chen, Z., Backes, M., Shen, Y., & Zhang, Y. (2024). "Do Anything Now": Characterizing and evaluating in-the-wild jailbreak prompts on large language models. *CCS 2024*. arXiv:2308.03825.
+- Taori, R., et al. (2023). Stanford Alpaca: An instruction-following LLaMA model. GitHub, tatsu-lab/stanford_alpaca.
+- Team OLMo (2025). 2 OLMo 2 Furious. *arXiv:2501.00656*.
+- Turner, A. M., Thiergart, L., Leech, G., Udell, D., Vazquez, J. J., Mini, U., & MacDiarmid, M. (2023). Steering language models with activation engineering. *arXiv:2308.10248*.
+- Wei, A., Haghtalab, N., & Steinhardt, J. (2023). Jailbroken: How does LLM safety training fail? *NeurIPS 2023*. arXiv:2307.02483.
+- Wollschläger, T., et al. (2025). The geometry of refusal in large language models: Concept cones and representational independence. *ICML 2025*. arXiv:2502.17420.
+- Zhao, J., Huang, J., Wu, Z., Bau, D., & Shi, W. (2025). LLMs encode harmfulness and refusal separately. *arXiv:2507.11878*.
+- Zou, A., et al. (2023a). Representation engineering: A top-down approach to AI transparency. *arXiv:2310.01405*.
+- Zou, A., Wang, Z., Carlini, N., Nasr, M., Kolter, J. Z., & Fredrikson, M. (2023b). Universal and transferable adversarial attacks on aligned language models. *arXiv:2307.15043*.
 
 ## Appendices
 
@@ -301,3 +402,95 @@ The cleanest next step is to estimate the refusal direction from the original mo
 <sub>Data: [r_stratum_comparison.csv](results/probes/matched/r_stratum_comparison.csv) (`ref_after_safe`). Regenerate with `python -m src.plots.readme_figures`.</sub>
 
 **B.** Refusal probe after deleting r: a check that the deletion worked. Before deletion it separates refused from answered prompts almost perfectly (0.997–1.000). Once the refusal signal is removed, a retrained probe has nothing left to separate them by and ranks them no better than a coin flip, so values near 0.5 confirm the deletion. This panel concerns the deletion only, not how refusal relates to harm. The four marked layers stay above 0.60 on this split. Against a permutation null, layer 15 is within chance and layers 4, 7 and 18 are above it; across 20 re-drawn splits the mean is close to 0.5 at every layer (Section 5.3 figure), so the deletion removes refusal at all layers.
+
+### Per-layer results across models
+
+![The Section 5.5 panels plotted by layer number instead of relative depth](results/figures/compare_models_layer.png)
+
+<sub>Regenerate with the Section 5.5 command plus `--x layer --replot`.</sub>
+
+*Figure: the Section 5.5 panels by layer number.* The curves are the same as in the depth figure. Llama and OLMo end at layer 16 and Qwen at 28, so equal layer numbers are not equal depths: Qwen's L13 sits at depth 0.46, near Llama's and OLMo's L7.
+
+*Tables: per-layer values behind both figures.* Columns:
+
+- **Angle before:** angle between r and d before deletion.
+- **Change:** how much that angle changes when r is deleted. The angle after deletion is 90° at every layer (largest deviation 0.0001°), so the change is 90° minus the angle before.
+- **Harm before / after:** matched harm probe AUROC on the clean states, and retrained after deleting r. A negative harm change is a drop.
+- **Refusal before / after:** refusal probe AUROC on the safe prompts of the cue corpus, before and after deleting r.
+
+Data: [compare_models.csv](results/figures/compare_models.csv).
+
+**Qwen2.5-1.5B-Instruct** (28 layers)
+
+| Layer | Depth | Angle before (°) | Change (°) | Harm before | Harm after | Harm change | Refusal before | Refusal after |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0.04 | 80.4 | +9.6 | 0.689 | 0.679 | -0.010 | 0.997 | 0.522 |
+| 2 | 0.07 | 94.2 | -4.2 | 0.770 | 0.769 | -0.001 | 0.998 | 0.529 |
+| 3 | 0.11 | 88.4 | +1.6 | 0.789 | 0.791 | +0.001 | 0.998 | 0.444 |
+| 4 | 0.14 | 99.0 | -9.0 | 0.809 | 0.804 | -0.005 | 0.997 | 0.631 |
+| 5 | 0.18 | 95.4 | -5.4 | 0.801 | 0.799 | -0.002 | 0.998 | 0.555 |
+| 6 | 0.21 | 103.8 | -13.8 | 0.783 | 0.793 | +0.010 | 0.999 | 0.456 |
+| 7 | 0.25 | 100.2 | -10.2 | 0.786 | 0.820 | +0.034 | 0.999 | 0.620 |
+| 8 | 0.29 | 93.0 | -3.0 | 0.818 | 0.827 | +0.009 | 1.000 | 0.496 |
+| 9 | 0.32 | 85.5 | +4.5 | 0.858 | 0.837 | -0.021 | 1.000 | 0.575 |
+| 10 | 0.36 | 80.4 | +9.6 | 0.884 | 0.858 | -0.025 | 1.000 | 0.591 |
+| 11 | 0.39 | 71.3 | +18.7 | 0.903 | 0.872 | -0.031 | 1.000 | 0.515 |
+| 12 | 0.43 | 66.0 | +24.0 | 0.907 | 0.878 | -0.028 | 1.000 | 0.480 |
+| 13 | 0.46 | 60.7 | +29.3 | 0.932 | 0.905 | -0.027 | 1.000 | 0.448 |
+| 14 | 0.50 | 55.0 | +35.0 | 0.956 | 0.954 | -0.002 | 1.000 | 0.505 |
+| 15 | 0.54 | 47.9 | +42.1 | 0.947 | 0.947 | +0.000 | 0.999 | 0.602 |
+| 16 | 0.57 | 41.6 | +48.4 | 0.959 | 0.955 | -0.004 | 1.000 | 0.545 |
+| 17 | 0.61 | 34.4 | +55.6 | 0.959 | 0.955 | -0.004 | 1.000 | 0.439 |
+| 18 | 0.64 | 32.7 | +57.3 | 0.960 | 0.954 | -0.005 | 0.999 | 0.658 |
+| 19 | 0.68 | 27.5 | +62.5 | 0.960 | 0.952 | -0.008 | 0.999 | 0.401 |
+| 20 | 0.71 | 30.9 | +59.1 | 0.961 | 0.961 | +0.000 | 0.998 | 0.452 |
+| 21 | 0.75 | 32.0 | +58.0 | 0.959 | 0.957 | -0.002 | 0.999 | 0.512 |
+| 22 | 0.79 | 31.2 | +58.8 | 0.960 | 0.959 | -0.001 | 0.998 | 0.470 |
+| 23 | 0.82 | 30.5 | +59.5 | 0.959 | 0.956 | -0.003 | 0.997 | 0.552 |
+| 24 | 0.86 | 30.7 | +59.3 | 0.962 | 0.957 | -0.005 | 0.995 | 0.495 |
+| 25 | 0.89 | 30.1 | +59.9 | 0.961 | 0.958 | -0.003 | 0.998 | 0.463 |
+| 26 | 0.93 | 30.1 | +59.9 | 0.963 | 0.958 | -0.005 | 0.998 | 0.411 |
+| 27 | 0.96 | 32.2 | +57.8 | 0.959 | 0.956 | -0.002 | 0.997 | 0.464 |
+| 28 | 1.00 | 36.8 | +53.2 | 0.961 | 0.955 | -0.007 | 0.997 | 0.568 |
+
+**Llama-3.2-1B-Instruct** (16 layers)
+
+| Layer | Depth | Angle before (°) | Change (°) | Harm before | Harm after | Harm change | Refusal before | Refusal after |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0.06 | 50.9 | +39.1 | 0.634 | 0.634 | +0.000 | 0.993 | 0.470 |
+| 2 | 0.12 | 79.0 | +11.0 | 0.782 | 0.788 | +0.006 | 0.999 | 0.551 |
+| 3 | 0.19 | 78.9 | +11.1 | 0.858 | 0.868 | +0.010 | 0.999 | 0.580 |
+| 4 | 0.25 | 65.9 | +24.1 | 0.825 | 0.838 | +0.012 | 1.000 | 0.465 |
+| 5 | 0.31 | 48.9 | +41.1 | 0.882 | 0.893 | +0.011 | 1.000 | 0.504 |
+| 6 | 0.38 | 41.0 | +49.0 | 0.921 | 0.926 | +0.005 | 1.000 | 0.471 |
+| 7 | 0.44 | 31.7 | +58.3 | 0.963 | 0.971 | +0.008 | 1.000 | 0.468 |
+| 8 | 0.50 | 41.7 | +48.3 | 0.980 | 0.982 | +0.002 | 1.000 | 0.555 |
+| 9 | 0.56 | 40.4 | +49.6 | 0.978 | 0.981 | +0.003 | 1.000 | 0.518 |
+| 10 | 0.62 | 36.5 | +53.5 | 0.986 | 0.985 | -0.001 | 1.000 | 0.523 |
+| 11 | 0.69 | 41.5 | +48.5 | 0.986 | 0.984 | -0.002 | 1.000 | 0.413 |
+| 12 | 0.75 | 42.3 | +47.7 | 0.988 | 0.986 | -0.002 | 1.000 | 0.421 |
+| 13 | 0.81 | 44.9 | +45.1 | 0.988 | 0.989 | +0.001 | 1.000 | 0.622 |
+| 14 | 0.88 | 45.0 | +45.0 | 0.986 | 0.986 | +0.000 | 1.000 | 0.378 |
+| 15 | 0.94 | 46.3 | +43.7 | 0.985 | 0.986 | +0.001 | 1.000 | 0.638 |
+| 16 | 1.00 | 44.0 | +46.0 | 0.981 | 0.984 | +0.003 | 1.000 | 0.373 |
+
+**OLMo-2-0425-1B-Instruct** (16 layers)
+
+| Layer | Depth | Angle before (°) | Change (°) | Harm before | Harm after | Harm change | Refusal before | Refusal after |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0.06 | 93.6 | -3.6 | 0.664 | 0.670 | +0.006 | 0.997 | 0.489 |
+| 2 | 0.12 | 90.3 | -0.3 | 0.772 | 0.773 | +0.002 | 0.999 | 0.476 |
+| 3 | 0.19 | 111.8 | -21.8 | 0.748 | 0.743 | -0.005 | 1.000 | 0.459 |
+| 4 | 0.25 | 90.0 | -0.0 | 0.836 | 0.818 | -0.018 | 1.000 | 0.446 |
+| 5 | 0.31 | 92.3 | -2.3 | 0.837 | 0.834 | -0.003 | 1.000 | 0.482 |
+| 6 | 0.38 | 83.6 | +6.4 | 0.921 | 0.911 | -0.010 | 1.000 | 0.556 |
+| 7 | 0.44 | 78.5 | +11.5 | 0.949 | 0.945 | -0.005 | 1.000 | 0.590 |
+| 8 | 0.50 | 50.9 | +39.1 | 0.948 | 0.963 | +0.015 | 1.000 | 0.586 |
+| 9 | 0.56 | 46.9 | +43.1 | 0.945 | 0.960 | +0.015 | 0.999 | 0.453 |
+| 10 | 0.62 | 43.4 | +46.6 | 0.963 | 0.964 | +0.001 | 1.000 | 0.464 |
+| 11 | 0.69 | 43.6 | +46.4 | 0.965 | 0.963 | -0.002 | 1.000 | 0.693 |
+| 12 | 0.75 | 41.7 | +48.3 | 0.962 | 0.966 | +0.004 | 1.000 | 0.564 |
+| 13 | 0.81 | 39.0 | +51.0 | 0.962 | 0.966 | +0.004 | 1.000 | 0.693 |
+| 14 | 0.88 | 43.3 | +46.7 | 0.964 | 0.967 | +0.003 | 1.000 | 0.586 |
+| 15 | 0.94 | 43.5 | +46.5 | 0.966 | 0.953 | -0.012 | 1.000 | 0.574 |
+| 16 | 1.00 | 43.7 | +46.3 | 0.964 | 0.966 | +0.002 | 1.000 | 0.377 |

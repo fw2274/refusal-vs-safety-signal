@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -31,9 +32,27 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+# Parallel CV workers per probe fit. Each worker copies the activations, so on a wide model (Llama,
+# d_model 2048) one worker per core ran the machine out of memory. Unset keeps all cores.
+N_JOBS = int(os.environ.get("PROBE_N_JOBS", "-1"))
+
 # Extended past 1.0: the confounded harm probe chose C == 1.0 at 17/28 layers, i.e. the optimum
 # lay outside the grid. main() now warns whenever the choice lands on the boundary.
 C_GRID = [1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0]
+
+
+def n_layers_of(act_dir: Path) -> int:
+    return json.loads((Path(act_dir) / "meta.json").read_text())["n_layers"]
+
+
+def sweep_layers(n_layers: int) -> list[int]:
+    """Every third layer from 1; for 28 layers this is the original [1, 4, ..., 28]."""
+    return list(range(1, n_layers + 1, 3))
+
+
+def default_layer(n_layers: int) -> int:
+    """Same relative depth as L13 of Qwen's 28 (0.46), so cross-model layers line up."""
+    return round(n_layers * 13 / 28)
 
 
 def make_probe() -> GridSearchCV:
@@ -41,7 +60,7 @@ def make_probe() -> GridSearchCV:
     pipe = Pipeline(
         [("scale", StandardScaler()), ("lr", LogisticRegression(max_iter=2000))]
     )
-    return GridSearchCV(pipe, {"lr__C": C_GRID}, scoring="roc_auc", cv=5, n_jobs=-1)
+    return GridSearchCV(pipe, {"lr__C": C_GRID}, scoring="roc_auc", cv=5, n_jobs=N_JOBS)
 
 
 def tpr_at_fpr(y: np.ndarray, s: np.ndarray, target: float = 0.01) -> tuple[float, float]:

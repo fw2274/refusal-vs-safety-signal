@@ -1,0 +1,41 @@
+refusal subspace from llama-cue: 304 refused / 442 complied (benign, train)
+harm evaluated on llama-matched: train=490 test=160 (5 test groups)
+
+=== Part A: layer sweep (rank-1 refusal erasure) ===
+  L  ref clean  ref erased  harm clean  transfer  retrain   random  leace rt
+  1      0.993       0.470       0.634     0.616    0.634    0.629     0.635
+  4      1.000       0.465       0.825     0.775    0.838    0.825     0.840
+  7      1.000       0.468       0.963     0.943    0.971    0.963     0.969
+ 10      1.000       0.523       0.986     0.981    0.985    0.987     0.988
+ 13      1.000       0.622       0.988     0.973    0.989    0.988     0.988
+ 16      1.000       0.373       0.981     0.952    0.984    0.981     0.980
+
+=== Part B: rank-k erasure curve at L7 ===
+clean harm AUROC = 0.963 [0.913, 0.994]
+
+  k  ref erased  harm retrain           95% CI   random  delta vs random
+  1       1.000         0.963 [ 0.911, 0.994]    0.963           +0.000
+  2       1.000         0.963 [ 0.913, 0.994]    0.963           +0.000
+  4       0.996         0.964 [ 0.910, 0.995]    0.963           +0.001
+  8       0.946         0.965 [ 0.909, 0.995]    0.963           +0.002
+ 16       0.859         0.972 [ 0.934, 0.995]    0.963           +0.009
+
+--- erasure correctness ---
+refusal AUROC after rank-1 diff-in-means erasure: max 0.622, median 0.469 over swept layers
+refusal AUROC after LEACE:                        max 0.640
+
+at the evaluated layer L7: refusal AUROC after erasure = 0.468
+  ERASURE VERIFIED at this layer - refusal is at chance, so the harm numbers below are interpretable
+  layers where rank-1 erasure did NOT reach chance: [13] - treat those rows as uninterpretable
+
+--- harm survival at L7 ---
+clean            0.963
+transfer (Q1)    0.943   drop +0.020
+retrain  (Q2)    0.971   drop -0.008
+random control   0.963   drop +0.000
+leace retrain    0.969
+
+retrain drop -0.008 vs random control +0.000
+READING: harm survives refusal erasure - the drop is no larger than removing an
+  arbitrary direction. Evidence for a safety signal beyond refusal.
+wrote results\probes\llama-matched\phase7_sweep.csv

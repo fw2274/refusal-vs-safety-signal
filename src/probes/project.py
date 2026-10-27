@@ -51,9 +51,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import StandardScaler
 
-from src.probes.train import bootstrap_auroc, make_probe
+from src.probes.train import bootstrap_auroc, default_layer, make_probe, n_layers_of, sweep_layers
 
-SWEEP_LAYERS = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
 RANKS = [1, 2, 4, 8, 16]
 
 
@@ -118,7 +117,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cue-run", default="cue")
     ap.add_argument("--matched-run", default="matched")
-    ap.add_argument("--layer", type=int, default=13, help="layer for the rank-k curve")
+    ap.add_argument("--layer", type=int, default=None,
+                    help="layer for the rank-k curve; default: relative depth of Qwen L13")
     ap.add_argument("--boot", type=int, default=1000)
     args = ap.parse_args()
 
@@ -150,7 +150,7 @@ def main() -> None:
     print(f"{'L':>3} {'ref clean':>10} {'ref erased':>11} {'harm clean':>11} {'transfer':>9} "
           f"{'retrain':>8} {'random':>8} {'leace rt':>9}")
     rows = []
-    for L in SWEEP_LAYERS:
+    for L in sweep_layers(n_layers_of(dm)):
         Hc = np.load(dc / f"L{L:02d}.npy")
         Hm = np.load(dm / f"L{L:02d}.npy")
 
@@ -185,7 +185,7 @@ def main() -> None:
     sweep = pd.DataFrame(rows)
 
     # ---------------- Part B: rank-k curve at the selected layer ------------------------
-    L = args.layer
+    L = args.layer or default_layer(n_layers_of(dm))
     print(f"\n=== Part B: rank-k erasure curve at L{L} ===")
     Hc = np.load(dc / f"L{L:02d}.npy")
     Hm = np.load(dm / f"L{L:02d}.npy")

@@ -31,16 +31,15 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
-from src.probes.train import bootstrap_auroc, make_probe
+from src.probes.train import bootstrap_auroc, default_layer, make_probe, n_layers_of, sweep_layers
 
-LAYERS = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default="multimech")
     ap.add_argument("--matched-run", default="matched")
-    ap.add_argument("--layer", type=int, default=13)
+    ap.add_argument("--layer", type=int, default=None, help="default: relative depth of Qwen L13")
     ap.add_argument("--boot", type=int, default=1000)
     args = ap.parse_args()
 
@@ -64,12 +63,13 @@ def main() -> None:
     print(f"{'L':>3}" + "".join(f"{'hold ' + m:>13}" for m in mechs)
           + f"{'within-mech':>13}{'matched':>10}")
     rows = []
-    for L in LAYERS:
+    n_layers = n_layers_of(d)
+    for L in sweep_layers(n_layers):
         H = np.load(d / f"L{L:02d}.npy")
         Hm = np.load(dm / f"L{L:02d}.npy")
         gm = make_probe(); gm.fit(Hm[m_tr], m_harm[m_tr])
 
-        rec = {"layer": L, "depth": L / 28}
+        rec = {"layer": L, "depth": L / n_layers}
         cross, within, matched = [], [], []
         for m in mechs:
             te = mech == m
@@ -107,7 +107,7 @@ def main() -> None:
 
     df = pd.DataFrame(rows)
 
-    L = args.layer
+    L = args.layer or default_layer(n_layers)
     H = np.load(d / f"L{L:02d}.npy")
     print(f"\n--- layer {L}, with cluster-bootstrap intervals over topic groups ---")
     print(f"{'held-out mechanism':<22} {'cross-mech':>11} {'95% CI':>17} {'within-mech':>12} "

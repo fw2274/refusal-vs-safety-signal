@@ -43,8 +43,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from src.probes.project import apply_basis, auroc, diffmeans_basis, probe_auroc, random_basis
-
-N_LAYERS = 28
+from src.probes.train import n_layers_of
 
 
 def paired_boot(y: np.ndarray, sa: np.ndarray, sb: np.ndarray, n: int, seed: int,
@@ -117,7 +116,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cue-run", default="cue")
     ap.add_argument("--matched-run", default="matched")
-    ap.add_argument("--layers", type=int, nargs="*", default=list(range(1, N_LAYERS + 1)))
+    ap.add_argument("--layers", type=int, nargs="*", default=None, help="default: every layer")
     ap.add_argument("--boot", type=int, default=2000)
     ap.add_argument("--perms", type=int, default=200)
     ap.add_argument("--resplits", type=int, default=0,
@@ -126,6 +125,7 @@ def main() -> None:
 
     dc = Path("results/activations") / args.cue_run
     dm = Path("results/activations") / args.matched_run
+    args.layers = args.layers or list(range(1, n_layers_of(dm) + 1))
     lc = pd.read_parquet(dc / "labels.parquet")
     lm = pd.read_parquet(dm / "labels.parquet")
 

@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
-from src.probes.train import bootstrap_auroc, make_probe
+from src.probes.train import bootstrap_auroc, default_layer, make_probe
 
 CONTRASTS = [
     ("advbench_vs_alpaca", "advbench", "alpaca"),
@@ -49,6 +49,7 @@ def main() -> None:
     ap.add_argument("--cue-run", default="cue")
     ap.add_argument("--ood-run", default="jbb")
     ap.add_argument("--boot", type=int, default=1000)
+    ap.add_argument("--layer", type=int, default=None, help="default: relative depth of Qwen L13")
     args = ap.parse_args()
 
     dm = Path("results/activations") / args.matched_run
@@ -114,33 +115,34 @@ def main() -> None:
         print(f"{L:>3} {indist:>13.3f}" + "".join(f"{rec[f'matched_{n}']:>22.3f}" for n in sets))
 
     df = pd.DataFrame(rows)
+    sel = args.layer or default_layer(n_layers)
 
     # Selected layer = earliest within the in-distribution peak's CI (one-SE rule).
-    Hm13 = np.load(dm / "L13.npy")
-    g13 = make_probe(); g13.fit(Hm13[m_tr], m_harm[m_tr])
-    lo13, hi13 = bootstrap_auroc(m_harm[m_te], g13.decision_function(Hm13[m_te]),
-                                 args.boot, groups=m_grp)
-    print(f"\nL13 in-distribution: {df[df.layer==13].matched_indist.iloc[0]:.3f} "
-          f"[{lo13:.3f}, {hi13:.3f}]")
+    HmS = np.load(dm / f"L{sel:02d}.npy")
+    gS = make_probe(); gS.fit(HmS[m_tr], m_harm[m_tr])
+    loS, hiS = bootstrap_auroc(m_harm[m_te], gS.decision_function(HmS[m_te]),
+                               args.boot, groups=m_grp)
+    print(f"\nL{sel} in-distribution: {df[df.layer==sel].matched_indist.iloc[0]:.3f} "
+          f"[{loS:.3f}, {hiS:.3f}]")
 
-    print(f"\n{'contrast':<24} {'matched L13':>12} {'matched best':>13} "
-          f"{'confounded L13':>15} {'confounded best':>16}")
+    print(f"\n{'contrast':<24} {f'matched L{sel}':>12} {'matched best':>13} "
+          f"{f'confounded L{sel}':>15} {'confounded best':>16}")
     summary = {}
     for name in sets:
-        m13 = df[df.layer == 13][f"matched_{name}"].iloc[0]
+        mS = df[df.layer == sel][f"matched_{name}"].iloc[0]
         mb = df[f"matched_{name}"].max()
-        c13 = df[df.layer == 13][f"confounded_{name}"].iloc[0]
+        cS = df[df.layer == sel][f"confounded_{name}"].iloc[0]
         cb = df[f"confounded_{name}"].max()
-        summary[name] = {"matched_L13": m13, "matched_best": mb,
-                         "confounded_L13": c13, "confounded_best": cb}
-        print(f"{name:<24} {m13:>12.3f} {mb:>13.3f} {c13:>15.3f} {cb:>16.3f}")
+        summary[name] = {f"matched_L{sel}": mS, "matched_best": mb,
+                         f"confounded_L{sel}": cS, "confounded_best": cb}
+        print(f"{name:<24} {mS:>12.3f} {mb:>13.3f} {cS:>15.3f} {cb:>16.3f}")
 
     hard = [n for n in sets if n.endswith("orbench")]
     if hard:
-        worst = min(summary[n]["matched_L13"] for n in hard)
+        worst = min(summary[n][f"matched_L{sel}"] for n in hard)
         print(f"\nhardest contrasts (cue held roughly constant): matched probe scores "
-              f"{worst:.3f} at L13 minimum")
-        conf_worst = min(summary[n]["confounded_L13"] for n in hard)
+              f"{worst:.3f} at L{sel} minimum")
+        conf_worst = min(summary[n][f"confounded_L{sel}"] for n in hard)
         print(f"  same contrasts, confounded probe: {conf_worst:.3f}")
         print("\nGATE: " + (
             "PASS - the matched probe transfers to unseen sources with surface cues held "
@@ -153,8 +155,8 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "matched_ood.csv", index=False)
     (out / "matched_ood_summary.json").write_text(json.dumps(
-        {"indist_L13": float(df[df.layer == 13].matched_indist.iloc[0]),
-         "indist_ci": [lo13, hi13], "contrasts": summary}, indent=2, default=float))
+        {f"indist_L{sel}": float(df[df.layer == sel].matched_indist.iloc[0]),
+         "indist_ci": [loS, hiS], "contrasts": summary}, indent=2, default=float))
     print(f"wrote {out / 'matched_ood.csv'}")
 
 

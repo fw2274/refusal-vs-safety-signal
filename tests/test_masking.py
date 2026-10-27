@@ -16,12 +16,17 @@ from transformers import AutoTokenizer
 from src.prompting import SYSTEM, prompt_ids, prompt_text, turn_end_id
 from src.train.sft_lora import MaskedSFTDataset, collate
 
-MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+# model -> the token its chat template closes an assistant turn with
+TURN_END = {
+    "Qwen/Qwen2.5-1.5B-Instruct": "<|im_end|>",
+    "meta-llama/Llama-3.2-1B-Instruct": "<|eot_id|>",
+    "allenai/OLMo-2-0425-1B-Instruct": "<|endoftext|>",  # NOT <|im_end|>, though it is in the vocab
+}
 
 
-@pytest.fixture(scope="module")
-def tok():
-    t = AutoTokenizer.from_pretrained(MODEL)
+@pytest.fixture(scope="module", params=list(TURN_END))
+def tok(request):
+    t = AutoTokenizer.from_pretrained(request.param)
     if t.pad_token is None:
         t.pad_token = t.eos_token
     return t
@@ -32,7 +37,7 @@ def test_prompt_text_ends_at_assistant_prefix(tok):
     text = prompt_text(tok, "What is 2+2?")
     assert SYSTEM in text
     assert "What is 2+2?" in text
-    assert text.rstrip().endswith("assistant"), text[-40:]
+    assert text.rstrip().endswith(("assistant", "assistant<|end_header_id|>", "<|assistant|>")), text[-40:]
 
 
 def test_prompt_ids_roundtrip(tok):
@@ -87,3 +92,16 @@ def test_overlong_prompt_is_dropped_not_truncated(tok):
     """Truncating the prompt would move the position we read activations from."""
     df = pd.DataFrame({"prompt": ["word " * 4000], "completion": ["I can't help with that."]})
     assert len(MaskedSFTDataset(df, tok, max_len=128)) == 0
+
+
+def test_prompt_text_has_no_live_date(tok):
+    """A template date that tracks the clock makes SFT and extraction see different prompts."""
+    import datetime
+
+    today = datetime.date.today().strftime("%d %b %Y")
+    assert today not in prompt_text(tok, "Hello")
+
+
+def test_turn_end_is_end_of_turn_token(tok):
+    """Labels must end on the token that closes an assistant turn, not end-of-document."""
+    assert tok.convert_ids_to_tokens(turn_end_id(tok)) == TURN_END[tok.name_or_path]
