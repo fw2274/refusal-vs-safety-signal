@@ -6,21 +6,20 @@
 
 ## Abstract
 
-(Draft.) Is a model's refusal the same signal as its recognition of harm? We fine-tune Qwen2.5-1.5B-Instruct to refuse safe prompts that sound alarming, estimate a refusal direction from safe prompts only, delete it from the hidden states, and probe for harm on held-out topic-matched prompts. Deletion removes refusal (a refusal probe falls to chance across 20 re-drawn splits), but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13), and deleting a random direction leaves it unchanged. The drop is significant only at layers 10, 12 and 13 (about 0.03), so harm and refusal are partly separable. Part of what survives may be alarming wording rather than harm, and we show harm is readable, not that the model uses it.
-
-(Maybe we should pick multiple models, and repeat it on different sizes and configurations too to compare refusal training effectiveness.)
+(Draft.) Is a model's refusal the same signal as its recognition of harm? We fine-tune Qwen2.5-1.5B-Instruct to refuse safe prompts that sound alarming, estimate a refusal direction from safe prompts only, delete it from the hidden states, and probe for harm on held-out topic-matched prompts. Deletion removes refusal (a refusal probe falls to chance across 20 re-drawn splits), but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13), and deleting a random direction leaves it unchanged. The drop is significant only at layers 10, 12 and 13 (about 0.03), so harm and refusal are partly separable. The result replicates in Llama-3.2-1B-Instruct and OLMo-2-1B-Instruct, where deletion costs harm decodability almost nothing at any layer. The geometry is model-specific: in Qwen and OLMo the two directions are near-perpendicular in early layers and converge past mid-depth, while in Llama they are aligned from the first layers. Part of what survives may be alarming wording rather than harm, and we show harm is readable, not that the model uses it.
 
 ## 1. Introduction
 
 Refusal in safety-tuned language models is carried largely by one direction in the hidden states (Arditi et al., 2024), and harmfulness can be read from the same states with linear probes. We ask whether these are one signal: if the refusal direction is removed, does the model still represent that a prompt is harmful?
 
-This is hard to test because harmful prompts are refused and safe ones answered, so harm and refusal are confounded. We fine-tune Qwen2.5-1.5B-Instruct to also refuse safe prompts that sound alarming, estimate the refusal direction from safe prompts only, delete it, and probe for harm on held-out topic-matched prompts.
+This is hard to test because harmful prompts are refused and safe ones answered, so harm and refusal are confounded. We fine-tune Qwen2.5-1.5B-Instruct to also refuse safe prompts that sound alarming, estimate the refusal direction from safe prompts only, delete it, and probe for harm on held-out topic-matched prompts. We then repeat the whole pipeline on Llama-3.2-1B-Instruct and OLMo-2-1B-Instruct, two other model families.
 
-Refusal falls to chance after deletion, but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13). Our contributions are:
+In Qwen, refusal falls to chance after deletion, but harm stays decodable at every layer (AUROC 0.932 → 0.905 at layer 13). The same holds in Llama and OLMo, with even smaller drops. Our contributions are:
 
 - a design that estimates the refusal direction with harm held fixed;
 - a layer-wise deletion test with random-direction, permutation and re-split controls;
-- evidence that harm and refusal are partly separable, bounded by a wording confound (Section 5.4).
+- evidence that harm and refusal are partly separable, bounded by a wording confound (Section 5.4);
+- a replication in three model families, showing that the deletion result holds in all three while the layer-wise geometry differs (Section 5.5).
 
 ## 2. Background and related work
 
