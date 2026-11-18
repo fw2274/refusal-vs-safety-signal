@@ -7,6 +7,7 @@ light and dark colours (prefers-color-scheme), so it reads on GitHub in either t
 
   docs/fig_angle_by_layer.svg           angle between r and d per layer (README Section 5.2)
   docs/fig_refusal_check_original.svg   refusal probe after deleting r, original split (Appendix)
+  docs/fig_inlp_rank_curve.svg          INLP rank-k erasure at layer 13 (Appendix)
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import math
 from pathlib import Path
 
 SRC = Path("results/probes/matched/r_stratum_comparison.csv")
+RANK_SRC = Path("results/probes/matched/phase7_rank_curve_L13.csv")
 OUT = Path("docs")
 
 W, H = 720, 340
@@ -33,6 +35,10 @@ STYLE = """
   .s1 { stroke: #2a78d6; fill: none; stroke-width: 2; stroke-linejoin: round; }
   .d1 { fill: #2a78d6; stroke: #fcfcfb; stroke-width: 2; }
   .d2 { fill: #eb6834; stroke: #fcfcfb; stroke-width: 2; }
+  .s2 { stroke: #eb6834; fill: none; stroke-width: 2; stroke-linejoin: round; }
+  .s3 { stroke: #8f8e89; fill: none; stroke-width: 2; stroke-dasharray: 6 4; }
+  .d3 { fill: #8f8e89; stroke: #fcfcfb; stroke-width: 2; }
+  .band { fill: #2a78d6; opacity: .14; }
   @media (prefers-color-scheme: dark) {
     .bg { fill: #1a1a19; }
     .t1, .lab { fill: #f0efec; }
@@ -42,6 +48,10 @@ STYLE = """
     .s1 { stroke: #3987e5; }
     .d1 { fill: #3987e5; stroke: #1a1a19; }
     .d2 { fill: #d95926; stroke: #1a1a19; }
+    .s2 { stroke: #d95926; }
+    .s3 { stroke: #77766f; }
+    .d3 { fill: #77766f; stroke: #1a1a19; }
+    .band { fill: #3987e5; opacity: .2; }
   }
 </style>
 """
@@ -124,11 +134,67 @@ def refusal_figure(rows: list[dict]) -> str:
     return "\n".join(p)
 
 
+def rank_figure() -> str:
+    """INLP rank-k curve: k on an evenly spaced log2 axis, three AUROC series on one scale."""
+    with RANK_SRC.open() as f:
+        rows = [{k: float(v) for k, v in row.items()} for row in csv.DictReader(f)]
+    ks = [int(r["k"]) for r in rows]
+    ylo, yhi = 0.45, 1.0
+    mr = 150  # room for direct labels at the right end
+    pw, ph = W - ML - mr, H - MT - MB
+    x = lambda i: ML + i / (len(ks) - 1) * pw
+    y = lambda v: MT + (yhi - v) / (yhi - ylo) * ph
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" '
+         f'height="{H}" role="img" aria-labelledby="t d">',
+         '<title id="t">INLP: removing k refusal directions at layer 13</title>'
+         '<desc id="d">Refusal probe AUROC falls only from 0.998 to 0.858 as INLP removes 1 to 16 '
+         'directions, never reaching chance; harm AUROC falls from 0.926 to 0.896, while removing '
+         'k random directions leaves harm at about 0.932.</desc>', STYLE,
+         f'<rect class="bg" width="{W}" height="{H}" rx="6"/>',
+         f'<text class="t1" x="{ML}" y="24">INLP: removing k refusal directions at layer 13</text>',
+         f'<text class="t2" x="{ML}" y="42">Qwen2.5-1.5B cue arm. Refusal never reaches chance, so '
+         f'INLP under-erases here.</text>']
+    for v in (0.5, 0.6, 0.7, 0.8, 0.9, 1.0):
+        p.append(f'<line class="grid" x1="{ML}" x2="{ML + pw}" y1="{y(v):.1f}" y2="{y(v):.1f}"/>')
+        p.append(f'<text class="t2" x="{ML - 8}" y="{y(v) + 4:.1f}" text-anchor="end">{v:.1f}</text>')
+    p.append(f'<line class="axis" x1="{ML}" x2="{ML + pw}" y1="{y(0.5):.1f}" y2="{y(0.5):.1f}"/>')
+    p.append(f'<text class="t2" x="{ML + 4}" y="{y(0.5) - 6:.1f}">chance (0.5)</text>')
+    p.append(f'<line class="axis" x1="{ML}" x2="{ML + pw}" y1="{MT + ph}" y2="{MT + ph}"/>')
+    for i, k in enumerate(ks):
+        p.append(f'<text class="t2" x="{x(i):.1f}" y="{MT + ph + 18}" text-anchor="middle">{k}</text>')
+    p.append(f'<text class="t2" x="{ML + pw / 2}" y="{H - 10}" text-anchor="middle">'
+             f'Directions removed (k)</text>')
+    p.append(f'<text class="t2" transform="translate(16 {MT + ph / 2}) rotate(-90)" '
+             f'text-anchor="middle">AUROC</text>')
+    band = ([f"{x(i):.1f},{y(r['ci_hi']):.1f}" for i, r in enumerate(rows)]
+            + [f"{x(i):.1f},{y(r['ci_lo']):.1f}" for i, r in reversed(list(enumerate(rows)))])
+    p.append(f'<polygon class="band" points="{" ".join(band)}"/>')
+    series = (("harm_random", "s3", "d3", "Harm, random"),
+              ("ref_erased", "s2", "d2", "Refusal, INLP"),
+              ("harm_retrain", "s1", "d1", "Harm, INLP"))
+    for col, line, dot, name in series:
+        pts = " ".join(f"{x(i):.1f},{y(r[col]):.1f}" for i, r in enumerate(rows))
+        p.append(f'<polyline class="{line}" points="{pts}"/>')
+        for i, r in enumerate(rows):
+            p.append(f'<circle class="{dot}" cx="{x(i):.1f}" cy="{y(r[col]):.1f}" r="4">'
+                     f'<title>{name}, k={ks[i]}: {r[col]:.3f}</title></circle>')
+    # direct labels at the right end, nudged apart where the series end close together
+    ends = sorted(((rows[-1][c], n) for c, _, _, n in series), reverse=True)
+    last_y = -1e9
+    for v, name in ends:
+        ty = max(y(v) + 4, last_y + 15)
+        p.append(f'<text class="lab" x="{ML + pw + 10}" y="{ty:.1f}">{name} {v:.3f}</text>')
+        last_y = ty
+    p.append("</svg>")
+    return "\n".join(p)
+
+
 def main() -> None:
     rows = load()
     OUT.mkdir(exist_ok=True)
     for name, svg in (("fig_angle_by_layer.svg", angle_figure(rows)),
-                      ("fig_refusal_check_original.svg", refusal_figure(rows))):
+                      ("fig_refusal_check_original.svg", refusal_figure(rows)),
+                      ("fig_inlp_rank_curve.svg", rank_figure())):
         (OUT / name).write_text(svg, encoding="utf-8")
         print(f"wrote {OUT / name}")
 

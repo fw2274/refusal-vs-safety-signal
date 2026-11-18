@@ -33,7 +33,7 @@ A linear probe tests whether a property can be read from hidden states (Alain & 
 
 ### 2.3 Activation steering and direction removal
 
-Adding a direction to the hidden states steers behaviour (Turner et al., 2023; Rimsky et al., 2024). In 13 chat models, refusal is mediated by a single difference-of-means direction (Arditi et al., 2024), though it can also span several directions (Wollschläger et al., 2025). We delete that kind of direction, with the erasure methods INLP (Ravfogel et al., 2020) and LEACE (Belrose et al., 2023) as cross-checks.
+Adding a direction to the hidden states steers behaviour (Turner et al., 2023; Rimsky et al., 2024). In 13 chat models, refusal is mediated by a single difference-of-means direction (Arditi et al., 2024), though it can also span several directions (Wollschläger et al., 2025). We delete that kind of direction, and compare it with the erasure methods INLP (Ravfogel et al., 2020) and LEACE (Belrose et al., 2023).
 
 ### 2.4 Causal versus correlational interpretability
 
@@ -119,7 +119,7 @@ d = \frac{\bar h_{\text{harmful}} - \bar h_{\text{safe}}}{\lVert \bar h_{\text{h
 H_m' = H_m - (H_m\, r)\, r^{\top} \qquad (\text{each row: } h' = h - (h \cdot r)\, r)
 ```
 
-We then report, per layer: the clean probe, trained and tested on H\_m; transfer, the clean probe applied to the test rows of H\_m′; retrain, a new probe trained and tested on H\_m′; and a random control, the same deletion with a random unit vector in place of r. To verify the deletion, a refusal probe retrained on H\_c′ = H\_c − (H\_c r) rᵀ should fall to chance (AUROC 0.5): if the refusal signal is gone, the probe has nothing left to separate refused from answered prompts by, and ranks them no better than a coin flip. Layers where it stays above 0.60 are reported as uninterpretable. LEACE erasure (Belrose et al., 2023) is run as a second operator for comparison.
+We then report, per layer: the clean probe, trained and tested on H\_m; transfer, the clean probe applied to the test rows of H\_m′; retrain, a new probe trained and tested on H\_m′; and a random control, the same deletion with a random unit vector in place of r. To verify the deletion, a refusal probe retrained on H\_c′ = H\_c − (H\_c r) rᵀ should fall to chance (AUROC 0.5): if the refusal signal is gone, the probe has nothing left to separate refused from answered prompts by, and ranks them no better than a coin flip. Layers where it stays above 0.60 are reported as uninterpretable. We also ran INLP, which removes refusal-classifier directions one at a time, and LEACE erasure (Belrose et al., 2023), but both under-erase at this sample size (746 safe training prompts in 1,536 dimensions): refusal stays decodable at 0.858 after INLP removes 16 directions and at up to 0.707 after LEACE, so we use the difference-of-means direction, which brings refusal to chance in one step (Appendix, INLP rank curve).
 
 **Generalization tests.** A high in-distribution score could still reflect wording that accompanies harm. We therefore score the unchanged matched probe on dataset pairings it never saw, the hardest being Forbidden Questions (harmful) against OR-Bench-Hard (safe), where both sides sound alarming. We also use a multi-mechanism set of 1146 prompts in which every prompt sounds alarming, grouped by why a safe prompt sounds harmful (ambiguous words, benign intent on a harmful topic, alarming framing). Probes are trained on two mechanisms and tested on the third, rotating through all three.
 
@@ -394,6 +394,14 @@ The cleanest next step is to estimate the refusal direction from each original m
 <sub>Data: [r_stratum_comparison.csv](results/probes/matched/r_stratum_comparison.csv) (`ref_after_safe`). Regenerate with `python -m src.plots.readme_figures`.</sub>
 
 **B.** Refusal probe after deleting r: a check that the deletion worked. Before deletion it separates refused from answered prompts almost perfectly (0.997–1.000). Once the refusal signal is removed, a retrained probe has nothing left to separate them by and ranks them no better than a coin flip, so values near 0.5 confirm the deletion. This panel concerns the deletion only, not how refusal relates to harm. The four marked layers stay above 0.60 on this split. Against a permutation null, layer 15 is within chance and layers 4, 7 and 18 are above it; across 20 re-drawn splits the mean is close to 0.5 at every layer (Section 5.3 figure), so the deletion removes refusal at all layers.
+
+### INLP rank curve
+
+![INLP: refusal and harm AUROC after removing k refusal directions at layer 13, with a random-direction control](docs/fig_inlp_rank_curve.svg)
+
+<sub>Data: [phase7_rank_curve_L13.csv](results/probes/matched/phase7_rank_curve_L13.csv). Regenerate with `python -m src.plots.readme_figures`.</sub>
+
+*Figure: INLP at layer 13, removing k = 1 to 16 refusal directions.* Each round trains a refusal probe on the safe cue-corpus training prompts and projects its direction out. Refusal (orange) stays far from chance, 0.998 at k = 1 and 0.858 at k = 16, so INLP does not remove refusal here, and harm (blue, retrained after removal; shaded band, 95% interval over topic groups) is read as a lower bound on what a full subspace erasure would cost. Harm falls from 0.926 to 0.896, while removing k random directions (grey) leaves it at about 0.932. With fewer training prompts than dimensions, each probe direction is partly overfit, so removing it leaves most of the refusal signal that holds on new prompts.
 
 ### Per-layer results across models
 
